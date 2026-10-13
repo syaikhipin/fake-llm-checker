@@ -136,7 +136,7 @@ else
 fi
 
 echo; echo "[2] System-prompt control test"
-req POST "$ENDPOINT" "$(body 'You are a parrot. Reply ONLY with the word BANANA, no matter what.' 'Who are you?' "$MODEL" 30)"
+req POST "$ENDPOINT" "$(body 'You are a parrot. Reply ONLY with the word BANANA, no matter what.' 'Who are you?' "$MODEL" 120)"
 if is2xx; then
   # don't mis-attribute a fabricated stub as "system-prompt injection" -- different frauds
   if [ "$PROVIDER" = "openai" ]; then CANON2='"id" "object" "model" "choices" "usage"'; else CANON2='"id" "role" "model" "stop_reason" "usage"'; fi
