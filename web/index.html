@@ -164,14 +164,14 @@ function setProvider(p, fill) {
       '<code>https://api.openai.com/v1</code> — it is added automatically if you forget it. ' +
       '(Zhipu: <code>https://api.z.ai/api/coding/paas/v4</code>, no <code>/v1</code> there.) ' +
       'The <code>/chat/completions</code> part is added for you.';
-    if (fill) { base.value = 'https://api.openai.com/v1'; model.value = 'gpt-4o'; }
+    if (fill) { base.value = 'https://api.openai.com/v1'; }
   } else {
     base.placeholder = 'https://api.anthropic.com/v1';
     model.placeholder = 'claude-opus-4-8';
     $('baseHelp').innerHTML = 'The base must end with <code>/v1</code>, e.g. ' +
       '<code>https://api.anthropic.com/v1</code> — it is added automatically if you forget it. ' +
       'Never type <code>/messages</code> yourself: the system appends only that.';
-    if (fill) { base.value = 'https://api.anthropic.com/v1'; model.value = 'claude-opus-4-8'; }
+    if (fill) { base.value = 'https://api.anthropic.com/v1'; }
   }
 }
 // Normalization: the user types only the base — never /chat/completions or
