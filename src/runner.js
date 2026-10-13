@@ -53,7 +53,8 @@ async function runJob(job) {
     }
     const html = scanner.findReportHtml(jobDir);
     const reportPath = html ? path.basename(html) : null;
-    const summary = { moduleVerdict: parsed.moduleVerdict, fingerprint: parsed.fingerprint };
+    const summary = { moduleVerdict: parsed.moduleVerdict, fingerprint: parsed.fingerprint,
+      servedModel: parsed.served };
 
     if (spawnError && !parsed.moduleVerdict && parsed.verdict === 'inconclusive') {
       db.finish(job.id, 'error', { error: `scanner failed to start: ${spawnError}` });

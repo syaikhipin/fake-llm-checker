@@ -28,9 +28,10 @@ browser ──POST /api/checks──▶ Express API ──SQLite queue──▶ 
   private ranges, or `169.254.x.x` metadata).
 - **Rate limiting**: 60 requests/minute per IP, plus a cap on concurrent scans.
 - **Provider choice**: the UI offers OpenAI-compatible vs Claude-compatible endpoints.
-  OpenAI-style bases usually end with `/v1` (e.g. `https://api.openai.com/v1`); the UI
-  strips one trailing `/v1` and the engine appends `/chat/completions`. Claude-style
-  bases are the bare host (`https://api.anthropic.com`); the engine appends `/v1/messages`.
+  Bases must end with `/v1` (e.g. `https://api.openai.com/v1`,
+  `https://api.anthropic.com/v1`) — the UI adds it if forgotten and the engine
+  enforces it; the checker then appends only `/chat/completions` or `/messages`.
+  Zhipu bases (`.../paas/v4`) are the exception with no `/v1`.
 
 ## Quickstart (local, Docker)
 
@@ -90,9 +91,11 @@ curl -s http://localhost:3000/api/checks/<id>
 ```
 
 `provider` is `auto` (default) | `openai` | `anthropic`. The UI offers an
-OpenAI-compatible / Claude choice: OpenAI-style endpoints use
-`$BASE/v1/chat/completions` (Zhipu `z.ai`/`bigmodel.cn` use `$BASE/chat/completions`,
-no `/v1`), Claude-style use `$BASE/v1/messages`.
+OpenAI-compatible / Claude choice. Bases carry a mandatory trailing `/v1`
+(the UI adds it if missing; Zhipu `z.ai`/`bigmodel.cn` bases like
+`.../paas/v4` are the exception with no `/v1`); the checker then appends only
+`/chat/completions` (OpenAI-style) or `/messages` (Claude-style). Users never
+type those paths — any pasted suffix is stripped.
 
 ## Dead keys don't produce verdicts
 

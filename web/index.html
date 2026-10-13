@@ -151,7 +151,7 @@ const NAMES = {real:'🟢 REAL MODEL', unverified:'🟡 MODEL UNVERIFIED', suspi
 
 // Provider choice drives the request shape the checker uses.
 // OpenAI shape: base + /chat/completions (base usually ends with /v1).
-// Claude shape:  base + /messages (base is the bare host, e.g. api.anthropic.com).
+// Claude shape:  base (/v1 mandatory) + /messages.
 let provider = 'openai';
 function setProvider(p, fill) {
   provider = p;
@@ -166,25 +166,25 @@ function setProvider(p, fill) {
       'The <code>/chat/completions</code> part is added for you.';
     if (fill) { base.value = 'https://api.openai.com/v1'; model.value = 'gpt-4o'; }
   } else {
-    base.placeholder = 'https://api.anthropic.com';
+    base.placeholder = 'https://api.anthropic.com/v1';
     model.placeholder = 'claude-opus-4-8';
-    $('baseHelp').innerHTML = 'Just the host, e.g. <code>https://api.anthropic.com</code> — never type ' +
-      '<code>/messages</code> yourself, it is added for you. (If you paste a full path by ' +
-      'mistake, the extra part is stripped automatically.)';
-    if (fill) { base.value = 'https://api.anthropic.com'; model.value = 'claude-opus-4-8'; }
+    $('baseHelp').innerHTML = 'The base must end with <code>/v1</code>, e.g. ' +
+      '<code>https://api.anthropic.com/v1</code> — it is added automatically if you forget it. ' +
+      'Never type <code>/messages</code> yourself: the system appends only that.';
+    if (fill) { base.value = 'https://api.anthropic.com/v1'; model.value = 'claude-opus-4-8'; }
   }
 }
 // Normalization: the user types only the base — never /chat/completions or
-// /messages. Strip any path suffix they may have pasted, then for
-// OpenAI-compatible endpoints the trailing /v1 is MANDATORY, so re-add it
-// (Zhipu-style bases like .../paas/v4 are the exception: they have no /v1).
+// /messages. Strip any path suffix they may have pasted, then the trailing
+// /v1 is MANDATORY for both API styles, so re-add it (Zhipu-style bases like
+// .../paas/v4 are the exception: they have no /v1).
 function normalizeBase(u) {
   u = u.trim().replace(/\/+$/, '')
     .replace(/\/v1\/messages$/i, '')
     .replace(/\/(chat\/completions|messages)$/i, '')
     .replace(/\/v1$/i, '')
     .replace(/\/+$/, '');
-  if (provider === 'openai' && !/[/.]z\.ai[/:]|bigmodel\.cn/i.test(u)) u += '/v1';
+  if (!/[/.]z\.ai[/:]|bigmodel\.cn/i.test(u)) u += '/v1';
   return u;
 }
 
@@ -237,6 +237,14 @@ async function poll(id) {
 
 function render(j) {
   let h = '<p class="mono">status: ' + esc(j.status) + ' · id: ' + esc(j.id) + '</p>';
+  const expM = j.model || '—';
+  const srvM = j.summary && j.summary.servedModel;
+  h += '<table>'
+    + row('Model expected', esc(expM))
+    + row('Model served to you', srvM
+        ? (srvM === expM ? esc(srvM) + ' ✓ match' : '<b>' + esc(srvM) + '</b> ⚠️ different from expected')
+        : '—')
+    + '</table>';
   if (j.verdict) {
     h += '<div class="verdict v-' + esc(j.verdict) + '" style="display:block">' + esc(NAMES[j.verdict] || j.verdict) + '</div>';
     h += '<table>'
@@ -262,10 +270,14 @@ async function loadHistory() {
     if (!r.ok) throw new Error(j.error || r.statusText);
     histLoaded = true;
     if (!j.checks.length) { $('hist').innerHTML = '<p class="mono">No scans yet.</p>'; return; }
-    let h = '<table><tr><td><b>Time (UTC)</b></td><td><b>Endpoint</b></td><td><b>Level</b></td><td><b>Status</b></td><td><b>Verdict</b></td></tr>';
+    let h = '<table><tr><td><b>Time (UTC)</b></td><td><b>Endpoint</b></td><td><b>Model expected → served</b></td><td><b>Level</b></td><td><b>Status</b></td><td><b>Verdict</b></td></tr>';
     for (const c of j.checks) {
+      const exp = c.model || '—';
+      const srv = c.summary && c.summary.servedModel;
+      const mcell = srv ? (srv === exp ? esc(exp) + ' ✓' : esc(exp) + ' → <b>' + esc(srv) + '</b>') : esc(exp);
       h += '<tr><td class="mono">' + esc((c.created_at || '').replace('T',' ').slice(0,19)) + '</td>'
         + '<td><a href="#" onclick="viewCheck(\'' + esc(c.id) + '\');return false;">' + esc(c.base_url) + '</a></td>'
+        + '<td class="mono">' + mcell + '</td>'
         + '<td>' + esc(c.level) + '</td><td>' + esc(c.status) + '</td>'
         + '<td>' + (c.verdict
             ? '<span class="vbadge v-' + esc(c.verdict) + '">' + esc(NAMES[c.verdict] || c.verdict) + '</span>'

@@ -23,8 +23,7 @@ KNOWN="${KNOWN:-0}"
 [ -z "$BASE" ] || [ -z "$KEY" ] && { echo "Usage: ./check-api.sh <base_url> <api_key> [model]"; exit 1; }
 BASE="${BASE%/}"
 # The UI sends only the base (never /chat/completions or /messages); strip any
-# path suffix a caller may have pasted so the versioned path below is
-# appended exactly once.
+# path suffix a caller may have pasted. The mandatory /v1 is (re-)added below.
 BASE="${BASE%/messages}"
 BASE="${BASE%/v1}"
 RED=$'\e[31m'; GRN=$'\e[32m'; YEL=$'\e[33m'; CYN=$'\e[36m'; DIM=$'\e[2m'; NC=$'\e[0m'
@@ -41,13 +40,14 @@ else MODEL="$MODEL_IN"; fi
 CORE=$(echo "$MODEL" | grep -oiE 'opus|sonnet|haiku|gpt-[0-9a-z.\-]+' | head -1)
 [ -z "$CORE" ] && CORE="$MODEL"
 
-# Zhipu (z.ai / bigmodel.cn) speaks the OpenAI API shape but mounts it at
-# $BASE/chat/completions and $BASE/models (no /v1 segment).
+# Bases carry a mandatory trailing /v1 (the UI enforces it); Zhipu-style bases
+# (z.ai / bigmodel.cn) are the exception with no /v1. Normalize once here so
+# the endpoint paths below append exactly one segment each.
 if echo "$BASE" | grep -qiE '[/.]z\.ai[/:]|bigmodel\.cn'; then
   [ "$PROVIDER" = "anthropic" ] || PROVIDER="openai"
-  V1=""; NATIVE_ID=1
+  NATIVE_ID=1
 else
-  V1="/v1"; NATIVE_ID=0
+  BASE="$BASE/v1"; NATIVE_ID=0
 fi
 
 interposed=0; malice=0
@@ -70,13 +70,13 @@ except Exception: pass" 2>/dev/null
 # provider-specific request shapes
 if [ "$PROVIDER" = "openai" ]; then
   AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE$V1/chat/completions"; if [ "$NATIVE_ID" = 1 ]; then IDPFX=""; else IDPFX="chatcmpl-"; fi
+  ENDPOINT="$BASE/chat/completions"; if [ "$NATIVE_ID" = 1 ]; then IDPFX=""; else IDPFX="chatcmpl-"; fi
   body(){ if [ -n "$1" ]; then printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"system","content":"%s"},{"role":"user","content":"%s"}]}' "$3" "$4" "$1" "$2"
     else printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$2"; fi; }
   gettext(){ jget "$1" "choices.0.message.content"; }
 else
   AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE$V1/messages"; IDPFX="msg_"
+  ENDPOINT="$BASE/messages"; IDPFX="msg_"
   body(){ if [ -n "$1" ]; then printf '{"model":"%s","max_tokens":%s,"system":"%s","messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$1" "$2"
     else printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$2"; fi; }
   gettext(){ jget "$1" "content.0.text"; }
@@ -154,7 +154,7 @@ if is2xx; then
 else inf "Skipped (HTTP ${STATUS} -- likely auth/balance, can't judge)."; fi
 
 echo; echo "[3] Model catalog audit (/models)"
-req GET "$BASE$V1/models"
+req GET "$BASE/models"
 if is2xx; then
   # real Anthropic uses created_at (ISO); one-api/new-api proxies use created (unix). Check both.
   STAMPS=$(echo "$BODY" | grep -oE '"created(_at)?":("?[^",}]*"?)')
@@ -182,7 +182,7 @@ else inf "Streaming check targets the Anthropic SSE schema; skipped for OpenAI."
 
 echo; echo "[6] Token-count endpoint (/v1/messages/count_tokens)"
 if [ "$PROVIDER" = "anthropic" ]; then
-  req POST "$BASE$V1/messages/count_tokens" "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"The quick brown fox jumps over the lazy dog.\"}]}"
+  req POST "$BASE/messages/count_tokens" "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"The quick brown fox jumps over the lazy dog.\"}]}"
   if is2xx && echo "$BODY" | grep -qE '"input_tokens"[[:space:]]*:[[:space:]]*[0-9]+'; then
     it=$(echo "$BODY" | grep -oE '"input_tokens"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1)
     if [ "${it:-0}" -ge 5 ] && [ "${it:-0}" -le 40 ]; then ok "count_tokens works and returns a plausible count ($it for a 9-word sentence)."
@@ -228,4 +228,4 @@ else
 fi
 # machine-readable summary line for the scan orchestrator
 if [ "$malice" -ge 1 ]; then vtag=fraud; elif [ "$interposed" = "1" ]; then vtag=interposed; else vtag=clean; fi
-echo "#APISH check verdict=$vtag malice=$malice interposed=$interposed"
+echo "#APISH check verdict=$vtag malice=$malice interposed=$interposed served=${SERVED:-}"

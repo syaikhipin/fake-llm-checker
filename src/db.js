@@ -53,7 +53,7 @@ const q = {
   active: db.prepare(`SELECT COUNT(*) AS n FROM checks WHERE status IN ('queued','running')`),
   finish: db.prepare(`UPDATE checks SET status=?, finished_at=?, verdict=?, malice=?,
     interposed=?, recon_signals=?, summary=?, report_path=?, error=? WHERE id = ?`),
-  list: db.prepare(`SELECT id, created_at, finished_at, status, base_url, level, verdict
+  list: db.prepare(`SELECT id, created_at, finished_at, status, base_url, model, level, verdict, summary
     FROM checks ORDER BY created_at DESC LIMIT 20`),
 };
 

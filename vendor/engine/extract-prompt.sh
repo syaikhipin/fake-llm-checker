@@ -21,8 +21,7 @@ CLI_RETRIES="${CLI_RETRIES:-4}"
 [ -z "$BASE" ] || [ -z "$KEY" ] && { echo "Usage: ./extract-prompt.sh <base_url> <api_key> [model]"; exit 1; }
 BASE="${BASE%/}"
 # The UI sends only the base (never /chat/completions or /messages); strip any
-# path suffix a caller may have pasted so the versioned path below is
-# appended exactly once.
+# path suffix a caller may have pasted. The mandatory /v1 is (re-)added below.
 BASE="${BASE%/messages}"
 BASE="${BASE%/v1}"
 RED=$'\e[31m'; GRN=$'\e[32m'; YEL=$'\e[33m'; CYN=$'\e[36m'; DIM=$'\e[2m'; NC=$'\e[0m'
@@ -34,21 +33,21 @@ fi
 if [ -z "$MODEL_IN" ]; then [ "$PROVIDER" = "openai" ] && MODEL="gpt-4o" || MODEL="claude-opus-4-8"; else MODEL="$MODEL_IN"; fi
 OUT="${OUT:-scam-evidence-$(date +%Y%m%d-%H%M%S).txt}"
 
-# Zhipu (z.ai / bigmodel.cn) speaks the OpenAI API shape but mounts it at
-# $BASE/chat/completions and $BASE/models (no /v1 segment).
+# Bases carry a mandatory trailing /v1 (the UI enforces it); Zhipu-style bases
+# (z.ai / bigmodel.cn) are the exception with no /v1. Normalize once here so
+# the endpoint paths below append exactly one segment each.
 if echo "$BASE" | grep -qiE '[/.]z\.ai[/:]|bigmodel\.cn'; then
   [ "$PROVIDER" = "anthropic" ] || PROVIDER="openai"
-  V1=""
 else
-  V1="/v1"
+  BASE="$BASE/v1"
 fi
 
 if [ "$PROVIDER" = "openai" ]; then
   AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE$V1/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "choices" "usage"'
+  ENDPOINT="$BASE/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "choices" "usage"'
 else
   AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE$V1/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "stop_reason" "usage"'
+  ENDPOINT="$BASE/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "stop_reason" "usage"'
 fi
 jstr(){ if command -v python3 >/dev/null 2>&1; then printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))'; else printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g;s/"/\\"/g')"; fi; }
 jget(){ if command -v python3 >/dev/null 2>&1; then echo "$1" | python3 -c "import sys,json

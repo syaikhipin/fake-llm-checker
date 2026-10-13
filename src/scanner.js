@@ -18,6 +18,7 @@ function parseTranscript(text) {
     gateway: null,
     reconSignals: null,
     fingerprint: null,
+    served: null, // model name the endpoint claimed in its response
   };
   let m = t.match(/^#\s*VERDICT:\s*(.+)$/m);
   if (m) {
@@ -28,10 +29,10 @@ function parseTranscript(text) {
     else if (/REAL MODEL/.test(v)) out.verdict = 'real';
   }
   // #APISH machine line keeps the engine's internal vocabulary; translate here.
-  m = t.match(/^#APISH check verdict=(\w+)\s+malice=(\d+)\s+interposed=(\d+)/m);
+  m = t.match(/^#APISH check verdict=(\w+)\s+malice=(\d+)\s+interposed=(\d+)(?:\s+served=(\S*))?/m);
   if (m) {
     out.moduleVerdict = { fraud: 'masked', interposed: 'unverified', clean: 'real' }[m[1]] || m[1];
-    out.malice = +m[2]; out.gateway = +m[3];
+    out.malice = +m[2]; out.gateway = +m[3]; out.served = m[4] || null;
   }
   m = t.match(/^#APISH recon signals=(\d+)/m);
   if (m) out.reconSignals = +m[1];
