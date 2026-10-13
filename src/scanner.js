@@ -15,20 +15,24 @@ function parseTranscript(text) {
     verdict: 'inconclusive',
     moduleVerdict: null,
     malice: null,
-    interposed: null,
+    gateway: null,
     reconSignals: null,
     fingerprint: null,
   };
   let m = t.match(/^#\s*VERDICT:\s*(.+)$/m);
   if (m) {
     const v = m[1];
-    if (/FRAUDULENT/.test(v)) out.verdict = 'fraud';
-    else if (/ANOMALIES/.test(v)) out.verdict = 'anomaly';
-    else if (/MIDDLEMAN/.test(v)) out.verdict = 'middleman';
-    else if (/CLEAN/.test(v)) out.verdict = 'clean';
+    if (/MASKED MODEL/.test(v)) out.verdict = 'masked';
+    else if (/POSSIBLY MASKED/.test(v)) out.verdict = 'suspicious';
+    else if (/MODEL UNVERIFIED/.test(v)) out.verdict = 'unverified';
+    else if (/REAL MODEL/.test(v)) out.verdict = 'real';
   }
+  // #APISH machine line keeps the engine's internal vocabulary; translate here.
   m = t.match(/^#APISH check verdict=(\w+)\s+malice=(\d+)\s+interposed=(\d+)/m);
-  if (m) { out.moduleVerdict = m[1]; out.malice = +m[2]; out.interposed = +m[3]; }
+  if (m) {
+    out.moduleVerdict = { fraud: 'masked', interposed: 'unverified', clean: 'real' }[m[1]] || m[1];
+    out.malice = +m[2]; out.gateway = +m[3];
+  }
   m = t.match(/^#APISH recon signals=(\d+)/m);
   if (m) out.reconSignals = +m[1];
   m = t.match(/^#APISH fingerprint pass=(\d+)\s+tot=(\d+)\s+blocked=(\d+)\s+foreign=(\d+)\s+pool=(\d+)\s+leak=(\d+)/m);

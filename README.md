@@ -1,11 +1,11 @@
 # 🕵️ fake-llm-checker
 
 A tiny SaaS that answers one question: **is that cheap LLM API endpoint you bought
-actually a man-in-the-middle proxy?**
+actually serving the real model — or a masked substitute?**
 
 It wraps an MIT-licensed open-source scan engine (vendored in `vendor/engine/`,
 see `LICENSE` there) in a web service: submit an endpoint + key, get a verdict
-(🟢 clean / 🟡 middleman / 🟠 anomaly / 🔴 fraud) plus the full HTML evidence report
+(🟢 real / 🟡 unverified / 🟠 suspicious / 🔴 masked) plus the full HTML evidence report
 the scan generates. 100% free stack: Node.js, SQLite, Docker — deployable
 on Render's free tier.
 
@@ -92,7 +92,7 @@ curl -s -H "x-api-key: $SERVICE_API_KEY" http://localhost:3000/api/checks/<id>
 If the endpoint rejects the submitted LLM key (HTTP 401/403 on the first live
 probe), the check is marked `inconclusive` with an explanatory error instead of
 a verdict — otherwise the upstream heuristics would misread "auth failed" as
-"rewritten API surface" and falsely report a middleman. Re-submit with a working key.
+"rewritten API surface" and falsely report the model as unverified. Re-submit with a working key.
 
 ## Honest limits (inherited from upstream)
 

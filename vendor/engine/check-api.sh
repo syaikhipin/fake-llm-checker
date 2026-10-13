@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # fake-llm-checker — checks whether an AI API endpoint (Claude/Anthropic- or OpenAI-style) is
-# legitimate or a man-in-the-middle reseller proxy. Defensive / consumer-protection only.
+# serving the genuine model or a masked substitute. Defensive / consumer-protection only.
 # Needs: curl. (python3 used for JSON if present; falls back to grep.)
 #
-# Verdict has two axes: (a) is a third party interposed, (b) is it behaving maliciously
-# (model swap / hijacked system prompt / fake catalog). It CANNOT detect a proxy that just
-# logs your prompts while forwarding them untouched — see "What this can't catch" in the README.
+# Verdict has two axes: (a) can the model's identity be verified, (b) does it behave
+# like the genuine model (model swap / hijacked system prompt / fake catalog).
+# It CANNOT detect an endpoint that serves the real model while quietly logging your
+# prompts — see "What this can't catch" in the README.
 #
 # Usage:
 #   ./check-api.sh <base_url> <api_key> [model]
@@ -87,7 +88,7 @@ echo; echo "[0] Static checks"
 case "$BASE" in
   *api.anthropic.com*|*api.openai.com*) ok "Official domain." ;;
   *) if [ "$KNOWN" = "1" ]; then mid "Non-official domain (expected: you declared a gateway)."
-     else interposed=1; mid "Base URL is NOT an official domain -> a third party is in the path."; fi ;;
+     else interposed=1; mid "Base URL is NOT an official domain -> the model's identity cannot be verified as genuine."; fi ;;
 esac
 case "$KEY" in sk-ant-*|sk-proj-*) ok "Key prefix looks official." ;; *) mid "Key prefix is not an official format." ;; esac
 
@@ -96,9 +97,9 @@ START=$(date +%s%3N 2>/dev/null || date +%s)
 req POST "$ENDPOINT" "$(body '' 'say OK' "$MODEL" 20)"
 END=$(date +%s%3N 2>/dev/null || date +%s)
 # headers reveal the proxy even on an error response
-grep -qi '^Via:' "$HFILE" && { interposed=1; mid "Header 'Via' present -> interposed proxy in the path."; } || ok "No 'Via' proxy header."
+grep -qi '^Via:' "$HFILE" && { interposed=1; mid "Header 'Via' present -> the request passes through an extra server; model identity unverified."; } || ok "No 'Via' proxy header."
 RID=$(grep -i '^X-Request-Id:' "$HFILE" | tr -d '\r')
-{ echo "$RID" | grep -q 'req_' && echo "$RID" | grep -q ','; } && { interposed=1; mid "X-Request-Id concatenates a proxy id + a real upstream id."; }
+{ echo "$RID" | grep -q 'req_' && echo "$RID" | grep -q ','; } && { interposed=1; mid "X-Request-Id mixes a gateway id with the genuine upstream id -> model identity unclear."; }
 grep -qi '^CF-RAY:' "$HFILE" && inf "Behind Cloudflare ($(grep -i '^CF-RAY:' "$HFILE" | tr -d '\r')) -- common for reseller proxies, not proof on its own."
 if is2xx; then
   # Schema completeness: a real 200 ALWAYS carries these fields. A fabricated stub drops most.
@@ -106,9 +107,9 @@ if is2xx; then
   MISS=0; MISSF=""
   for f in $CANON; do echo "$BODY" | grep -q "$f" || { MISS=$((MISS+1)); MISSF="$MISSF $f"; }; done
   if [ "$MISS" -ge 3 ]; then
-    bad "FABRICATED STUB: a 200 missing $MISS/5 canonical fields ($MISSF ). The proxy is not forwarding to a real model -- it returns a canned payload (often anti-analysis, e.g. 'Please use Claude Code CLI')."
+    bad "FABRICATED STUB: a 200 missing $MISS/5 canonical fields ($MISSF ). The endpoint is not serving a real model -- it returns a canned payload (often anti-analysis, e.g. 'Please use Claude Code CLI')."
   else
-    echo "$BODY" | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$IDPFX" && ok "Native '$IDPFX' id present." || { interposed=1; mid "Response missing the '$IDPFX...' id the real API returns -> rewritten response."; }
+    echo "$BODY" | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$IDPFX" && ok "Native '$IDPFX' id present." || { interposed=1; mid "Response missing the '$IDPFX...' id the real API returns -> response was rewritten; cannot confirm the genuine model."; }
     SERVED=$(jget "$BODY" "model")
     if [ -n "$SERVED" ]; then
       if echo "$SERVED" | grep -qi "$CORE"; then ok "Served model '$SERVED' matches the '$CORE' family you requested."
@@ -130,7 +131,7 @@ if is2xx; then
   if [ "$MISS2" -ge 3 ]; then
     inf "Same fabricated stub as probe [1] (missing $MISS2/5 fields) -> can't evaluate system-prompt handling; already counted."
   else
-    echo "$BODY" | grep -qi 'BANANA' && ok "Endpoint honored YOUR system prompt (no identity injection)." || bad "Your system prompt was IGNORED -> the proxy injects its own system prompt."
+    echo "$BODY" | grep -qi 'BANANA' && ok "Endpoint honored YOUR system prompt (no identity injection)." || bad "Your system prompt was IGNORED -> the endpoint injects its own system prompt."
   fi
 else inf "Skipped (HTTP ${STATUS} -- likely auth/balance, can't judge)."; fi
 
@@ -157,8 +158,8 @@ if [ "$PROVIDER" = "anthropic" ]; then
   SR=$(curl -sS "${AUTH[@]}" -X POST "$ENDPOINT" -d "{\"model\":\"$MODEL\",\"max_tokens\":20,\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"count to three\"}]}" --max-time 40 2>/dev/null)
   if echo "$SR" | grep -q 'message_start' && echo "$SR" | grep -q 'content_block_delta' && echo "$SR" | grep -q 'message_stop'; then
     ok "Valid Anthropic SSE stream (message_start / content_block_delta / message_stop)."
-  elif echo "$SR" | grep -q '"id"[[:space:]]*:[[:space:]]*"msg_'; then interposed=1; mid "Asked for a stream but got a non-streamed body -> endpoint doesn't implement Anthropic streaming faithfully (rewritten)."
-  else interposed=1; mid "Stream request returned neither a valid SSE sequence nor a real message (stub/rewritten body)."; fi
+  elif echo "$SR" | grep -q '"id"[[:space:]]*:[[:space:]]*"msg_'; then interposed=1; mid "Asked for a stream but got a non-streamed body -> endpoint doesn't stream like the genuine API (model behaviour unverified)."
+  else interposed=1; mid "Stream request returned neither a valid SSE sequence nor a real message (no genuine response)."; fi
 else inf "Streaming check targets the Anthropic SSE schema; skipped for OpenAI."; fi
 
 echo; echo "[6] Token-count endpoint (/v1/messages/count_tokens)"
@@ -168,15 +169,15 @@ if [ "$PROVIDER" = "anthropic" ]; then
     it=$(echo "$BODY" | grep -oE '"input_tokens"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1)
     if [ "${it:-0}" -ge 5 ] && [ "${it:-0}" -le 40 ]; then ok "count_tokens works and returns a plausible count ($it for a 9-word sentence)."
     else bad "count_tokens returned an implausible count ($it for a 9-word sentence) -> possible token inflation (over-billing)."; fi
-  else interposed=1; mid "count_tokens endpoint missing or non-conformant (the real Anthropic API implements it) -> incomplete/rewritten API surface."; fi
+  else interposed=1; mid "count_tokens endpoint missing or non-conformant (the real Anthropic API implements it) -> incomplete API surface; cannot confirm the genuine model."; fi
 else inf "count_tokens check targets the Anthropic API; skipped for OpenAI."; fi
 
 echo; echo "[7] Error-schema conformance"
 if [ "$PROVIDER" = "anthropic" ]; then
   req POST "$ENDPOINT" "{\"model\":\"$MODEL\",\"max_tokens\":20}"   # missing required "messages"
-  if is2xx; then interposed=1; mid "An invalid request (missing 'messages') returned HTTP ${STATUS} instead of a 400 -> no real validation (stub/rewritten)."
+  if is2xx; then interposed=1; mid "An invalid request (missing 'messages') returned HTTP ${STATUS} instead of a 400 -> no genuine validation."
   elif echo "$BODY" | grep -q '"type"[[:space:]]*:[[:space:]]*"error"' && echo "$BODY" | grep -q 'invalid_request_error'; then ok "Errors follow the Anthropic schema (type:error / invalid_request_error)."
-  else interposed=1; mid "Error response does not follow Anthropic's schema -> rewritten error surface. Got: $(echo "$BODY" | head -c 120)"; fi
+  else interposed=1; mid "Error response does not follow Anthropic's schema -> non-genuine error surface. Got: $(echo "$BODY" | head -c 120)"; fi
 else inf "Error-schema check targets the Anthropic API; skipped for OpenAI."; fi
 
 echo; echo "[8] Prompt caching (billing transparency)"
@@ -189,7 +190,7 @@ if [ "$PROVIDER" = "anthropic" ]; then
   if [ "${S1:-0}" -ge 200 ] && [ "${S1:-0}" -lt 300 ] && [ "${S2:-0}" -ge 200 ] && [ "${S2:-0}" -lt 300 ]; then
     if echo "$B2" | grep -qE '"cache_read_input_tokens"[[:space:]]*:[[:space:]]*[1-9]'; then ok "Prompt caching works (cache_read_input_tokens>0 on repeat) -> honest usage + real API."
     elif echo "$B1$B2" | grep -q 'cache_creation_input_tokens'; then inf "Caching fields present but no read hit on repeat (could be cache timing)."
-    else interposed=1; mid "No prompt-caching fields in usage -> endpoint doesn't implement Anthropic caching (incomplete API / rewritten usage; possible over-billing for cacheable input)."; fi
+    else interposed=1; mid "No prompt-caching fields in usage -> no genuine caching behaviour (possible over-billing for cacheable input)."; fi
   else inf "Inconclusive (HTTP ${S1:-0}/${S2:-0} -- gated/balance)."; fi
 else inf "Prompt-caching check targets the Anthropic API; skipped for OpenAI."; fi
 
@@ -197,15 +198,15 @@ rm -f "$HFILE"
 
 echo; echo "${CYN}=== VERDICT ===${NC}"
 if [ "$malice" -ge 1 ]; then
-  echo "${RED}FRAUDULENT BEHAVIOUR: $malice malicious signal(s) (model swap / hijacked prompt / fake catalog).${NC}"
+  echo "${RED}MASKED MODEL: $malice signal(s) this is not the genuine model (model swap / hijacked prompt / fake catalog).${NC}"
   echo "${RED}Do NOT send code, secrets or personal data. Collect evidence and dispute.${NC}"
 elif [ "$interposed" = "1" ]; then
-  if [ "$KNOWN" = "1" ]; then echo "${YEL}A gateway is in the path (you declared it) and showed no malicious behaviour in these probes.${NC}"
-  else echo "${YEL}A THIRD PARTY is interposed and you didn't go through an official domain.${NC}"
-       echo "${YEL}No model-swap or prompt hijack was caught here, but it still SEES every byte you send.${NC}"; fi
-  echo "${DIM}Note: these probes can't detect a proxy that just logs/harvests your prompts. The only safe rule is the official endpoint.${NC}"
+  if [ "$KNOWN" = "1" ]; then echo "${YEL}A gateway is in the route (you declared it) and the model behaved like the genuine one in these probes.${NC}"
+  else echo "${YEL}MODEL UNVERIFIED: the endpoint doesn't behave like the official API, so the model's identity can't be confirmed.${NC}"
+       echo "${YEL}No model-swap was caught here, but whoever runs it still SEES every byte you send.${NC}"; fi
+  echo "${DIM}Note: these probes can't detect an endpoint that serves the real model while quietly logging your prompts. The only safe rule is the official endpoint.${NC}"
 else
-  echo "${GRN}No interposition and no malicious behaviour detected. Behaves like a legitimate, direct endpoint.${NC}"
+  echo "${GRN}REAL MODEL: the endpoint behaved like the genuine model on every probe.${NC}"
 fi
 # machine-readable summary line for the scan orchestrator
 if [ "$malice" -ge 1 ]; then vtag=fraud; elif [ "$interposed" = "1" ]; then vtag=interposed; else vtag=clean; fi

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS checks (
   price         REAL,
   tier          TEXT,
   known         INTEGER NOT NULL DEFAULT 0,
-  verdict       TEXT,            -- clean | middleman | anomaly | fraud | inconclusive
+  verdict       TEXT,            -- real | unverified | suspicious | masked | inconclusive
   malice        INTEGER,
   interposed    INTEGER,
   recon_signals INTEGER,
@@ -54,11 +54,13 @@ const q = {
 
 function publicRow(r) {
   if (!r) return null;
-  const { summary, ...rest } = r;
+  // `interposed` is the engine's internal column name; the public API calls it `gateway`.
+  const { summary, interposed, ...rest } = r;
   let parsed = null;
   try { parsed = summary ? JSON.parse(summary) : null; } catch { /* ignore */ }
   return {
     ...rest,
+    gateway: interposed,
     summary: parsed,
     reportUrl: r.report_path ? `/api/checks/${r.id}/report` : null,
   };

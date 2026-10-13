@@ -2,7 +2,7 @@
   "dependencies": {
     "express": "^4.21.2"
   },
-  "description": "Check whether a cheap LLM API endpoint is a man-in-the-middle proxy",
+  "description": "Check whether a cheap LLM API serves the real model or a masked substitute",
   "license": "MIT",
   "main": "src/server.js",
   "name": "fake-llm-checker",

@@ -79,10 +79,10 @@ FP_POOL=$(echo "$FP_LINE" | grep -oE 'pool=[0-9]+' | cut -d= -f2); FP_POOL=${FP_
 FP_LEAK=$(echo "$FP_LINE" | grep -oE 'leak=[0-9]+' | cut -d= -f2); FP_LEAK=${FP_LEAK:-0}
 SIG=0; [ -n "$CHK_V" ] && SIG=$((SIG+CHK_M)); [ "$FP_FOREIGN" = "1" ] && SIG=$((SIG+1)); [ "$FP_LEAK" = "1" ] && SIG=$((SIG+1))
 if   [ -z "$CHK_V" ] && [ -z "$FP_LINE" ]; then CATE="⚪ INCONCLUSIVE (no behavioural module run)"; KEY_C=na
-elif [ "$SIG" -ge 2 ]; then CATE="🔴 FRAUDULENT BEHAVIOUR"; KEY_C=fraud
-elif [ "$SIG" -eq 1 ]; then CATE="🟠 ANOMALIES DETECTED"; KEY_C=anomaly
-elif [ "$CHK_I" = "1" ]; then CATE="🟡 UNDECLARED MIDDLEMAN"; KEY_C=middleman
-else CATE="🟢 CLEAN"; KEY_C=clean; fi
+elif [ "$SIG" -ge 2 ]; then CATE="🔴 MASKED MODEL"; KEY_C=masked
+elif [ "$SIG" -eq 1 ]; then CATE="🟠 POSSIBLY MASKED"; KEY_C=suspicious
+elif [ "$CHK_I" = "1" ]; then CATE="🟡 MODEL UNVERIFIED"; KEY_C=unverified
+else CATE="🟢 REAL MODEL"; KEY_C=real; fi
 
 echo; echo "${CYN}###############################################${NC}"
 echo "${CYN}#  VERDICT: $CATE${NC}"
@@ -98,7 +98,7 @@ STAMP=$(date -u +'%Y-%m-%d %H:%M:%SZ')
   echo "- Endpoint: \`$BASE\`"; echo "- Scan level: $LEVEL"; echo "- Date: $STAMP"; echo
   echo "## Summary by module"; echo
   echo "| Module | Result |"; echo "|--------|--------|"
-  [ -n "$CHK_V" ] && echo "| check-api (behaviour) | **$CHK_V** -- $CHK_M malicious signal(s), interposed=$CHK_I |"
+  [ -n "$CHK_V" ] && echo "| check-api (behaviour) | **$CHK_V** -- $CHK_M masking signal(s), extra server in route: $([ "$CHK_I" = "1" ] && echo yes || echo no) |"
   [ -n "$REC_S" ] && echo "| recon (infrastructure) | $REC_S risk signal(s) [context] |"
   if [ -n "$FP_LINE" ]; then
     if echo "$FP_LINE" | grep -q 'gated=1'; then echo "| fingerprint (model) | gated (use VIACLI=1) |"
@@ -111,21 +111,21 @@ STAMP=$(date -u +'%Y-%m-%d %H:%M:%SZ')
   if [ -f "$TRANSDIR/check.txt" ] || [ "$FP_FOREIGN" = "1" ]; then
     echo "## Why this verdict (behavioural signals)"; echo
     [ -f "$TRANSDIR/check.txt" ] && { grep '\[X\]' "$TRANSDIR/check.txt" | sed -E 's/.*\[X\] */- /' || true; }
-    [ "$FP_FOREIGN" = "1" ] && echo "- Session executes on the proxy's own infrastructure (backend OS does not match your client OS$([ "${FP_POOL:-0}" -gt 1 ] && echo "; pool of $FP_POOL backend workspaces")) -- not a transparent forward."
+    [ "$FP_FOREIGN" = "1" ] && echo "- Session runs on the seller's own machines (backend OS does not match your client OS$([ "${FP_POOL:-0}" -gt 1 ] && echo "; pool of $FP_POOL backend workspaces")) -- not the genuine provider's infrastructure."
     [ "$FP_LEAK" = "1" ] && echo "- Endpoint retained a planted code across separate requests -> shared context/cache (isolation/privacy failure)."
     echo
   fi
   echo "## What this analysis CANNOT prove"; echo
-  echo "- It cannot detect a proxy that forwards your prompt untouched while **logging/reselling** it."
+  echo "- It cannot detect an endpoint that serves the real model while quietly **logging/reselling** your prompts."
   echo "- A capability profile does not prove the exact tier (Opus vs Sonnet is indistinguishable from outside)."
-  echo "- This is a **technical** report, not a legal conclusion. \"Fraudulent behaviour\" describes what the probes show."; echo
+  echo "- This is a **technical** report, not a legal conclusion. \"Masked model\" describes what the probes show."; echo
   echo "## Recommended next steps"; echo
   case "$KEY_C" in
-    fraud)     echo "- Stop sending code/secrets/personal data through this endpoint."; echo "- Restore the official endpoint; collect this report + screenshots; dispute via the reseller, a chargeback, and the provider's Trust & Safety." ;;
-    anomaly)   echo "- One malicious signal found -- re-run to confirm it isn't transient before acting." ;;
-    middleman) echo "- A third party is interposed but no malice was caught. If you didn't set this gateway, it still sees all your traffic." ;;
-    clean)     echo "- No issues detected in these probes. Standard caution still applies for any non-official endpoint." ;;
-    *)         echo "- Re-run with at least the check-api module for a behavioural verdict." ;;
+    masked)     echo "- Stop sending code/secrets/personal data through this endpoint."; echo "- You are likely not getting the model you paid for; collect this report + screenshots and dispute via the reseller, a chargeback, or the provider's Trust & Safety." ;;
+    suspicious) echo "- One signal the model may not be genuine -- re-run to confirm it isn't transient before acting." ;;
+    unverified) echo "- The model's identity could not be verified. If you didn't set up this route yourself, whoever runs it still sees all your traffic." ;;
+    real)       echo "- The model behaved like the genuine article on every probe. Standard caution still applies for non-official endpoints." ;;
+    *)          echo "- Re-run with at least the check-api module for a behavioural verdict." ;;
   esac
   echo
   echo "## Full transcript"
@@ -137,7 +137,7 @@ STAMP=$(date -u +'%Y-%m-%d %H:%M:%SZ')
 } > "$BASEOUT.md"
 
 # ---- HTML ----
-case "$KEY_C" in fraud) COL='#ff5a52';; anomaly|middleman) COL='#febc2e';; clean) COL='#28c840';; *) COL='#8a8a8a';; esac
+case "$KEY_C" in masked) COL='#ff5a52';; suspicious|unverified) COL='#febc2e';; real) COL='#28c840';; *) COL='#8a8a8a';; esac
 {
   echo "<!doctype html><meta charset=\"utf-8\"><title>fake-llm-checker report - $DOMAIN</title>"
   echo "<style>body{background:#0c0c0c;color:#d6d6d6;font-family:Segoe UI,system-ui,sans-serif;max-width:900px;margin:0 auto;padding:32px}h1{font-size:24px}h2{font-size:18px;margin-top:28px;border-bottom:1px solid #222;padding-bottom:6px}h3{color:#9a9a9a;font-size:14px}.verdict{font-size:26px;font-weight:800;color:$COL;padding:16px 20px;border:2px solid $COL;border-radius:10px;margin:18px 0}table{border-collapse:collapse;width:100%}td{border:1px solid #222;padding:8px 12px;font-size:14px}tr td:first-child{color:#9fb0c3;width:34%}pre{background:#141414;border:1px solid #222;border-radius:8px;padding:14px;font-size:12.5px;white-space:pre-wrap;word-break:break-word;color:#cfcfcf;font-family:Consolas,monospace}.meta{color:#8a8a8a;font-size:13px}.lim{background:#1a1410;border-left:3px solid #b5673f;padding:10px 14px;font-size:13px;color:#caa}</style>"
@@ -145,7 +145,7 @@ case "$KEY_C" in fraud) COL='#ff5a52';; anomaly|middleman) COL='#febc2e';; clean
   echo "<div class=\"verdict\">$CATE</div>"
   echo "<div class=\"meta\">Endpoint: <code>$BASE</code> &middot; Level: $LEVEL &middot; $STAMP</div>"
   echo "<h2>Summary by module</h2><table>"
-  [ -n "$CHK_V" ] && echo "<tr><td>check-api (behaviour)</td><td><b>$CHK_V</b> - $CHK_M signal(s), interposed=$CHK_I</td></tr>"
+  [ -n "$CHK_V" ] && echo "<tr><td>check-api (behaviour)</td><td><b>$CHK_V</b> - $CHK_M masking signal(s)</td></tr>"
   [ -n "$REC_S" ] && echo "<tr><td>recon (infrastructure)</td><td>$REC_S risk signal(s) [context]</td></tr>"
   echo "</table>"
   if [ -f "$TRANSDIR/check.txt" ] && grep -q '\[X\]' "$TRANSDIR/check.txt"; then
@@ -156,7 +156,7 @@ case "$KEY_C" in fraud) COL='#ff5a52';; anomaly|middleman) COL='#febc2e';; clean
     echo "</ul>"
   fi
   echo "<h2>What this analysis cannot prove</h2>"
-  echo "<div class=\"lim\">It cannot detect a proxy that forwards your prompt untouched while logging/reselling it. A capability profile does not prove the exact tier. This is a technical report, not a legal conclusion.</div>"
+  echo "<div class=\"lim\">It cannot detect an endpoint that serves the real model while quietly logging/reselling your prompts. A capability profile does not prove the exact tier. This is a technical report, not a legal conclusion.</div>"
   echo "<h2>Full transcript</h2>"
   for f in "$TRANSDIR"/*.txt; do
     [ -f "$f" ] || continue

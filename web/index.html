@@ -3,87 +3,176 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>fake-llm-checker — is that cheap LLM API a scam proxy?</title>
+<title>fake-llm-checker — is the model real or masked?</title>
 <style>
-  body{background:#0c0c0c;color:#d6d6d6;font-family:Segoe UI,system-ui,sans-serif;max-width:760px;margin:0 auto;padding:32px 20px}
-  h1{font-size:24px} p.sub{color:#8a8a8a;font-size:14px}
-  label{display:block;margin:14px 0 4px;font-size:13px;color:#9fb0c3}
-  input,select{width:100%;box-sizing:border-box;background:#141414;border:1px solid #2a2a2a;color:#e6e6e6;border-radius:8px;padding:10px 12px;font-size:14px}
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --ink:#1c2333; --muted:#6b7280;
+    --line:#e5e7eb; --accent:#4f46e5; --accent-soft:#eef2ff;
+    --green:#15803d; --green-bg:#f0fdf4; --amber:#b45309; --amber-bg:#fffbeb;
+    --orange:#c2410c; --orange-bg:#fff7ed; --red:#b91c1c; --red-bg:#fef2f2;
+    --gray:#6b7280; --gray-bg:#f3f4f6;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:Segoe UI,system-ui,-apple-system,sans-serif;margin:0;padding:0}
+  .wrap{max-width:780px;margin:0 auto;padding:36px 20px 60px}
+  header.hero{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:18px;padding:30px 28px;margin-bottom:22px;box-shadow:0 10px 30px rgba(79,70,229,.25)}
+  header.hero h1{margin:0 0 8px;font-size:26px}
+  header.hero p{margin:0;opacity:.92;font-size:15px;line-height:1.5}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:18px;box-shadow:0 2px 10px rgba(17,24,39,.05)}
+  .card h2{margin:0 0 4px;font-size:17px}
+  .card p.desc{margin:0 0 6px;color:var(--muted);font-size:13.5px}
+  label{display:block;margin:16px 0 4px;font-size:13.5px;font-weight:600}
+  .help{font-size:12.5px;color:var(--muted);margin:2px 0 0;font-weight:400;line-height:1.45}
+  .help code{background:var(--gray-bg);padding:1px 6px;border-radius:5px;font-size:12px}
+  input,select{width:100%;background:#fff;border:1.5px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:6px}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .row{display:flex;gap:12px}.row>div{flex:1}
-  button{background:#2f6fed;border:none;color:#fff;border-radius:8px;padding:12px 18px;font-size:15px;cursor:pointer;margin-top:18px;width:100%}
-  button:disabled{opacity:.5;cursor:wait}
-  .chk{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px}
-  .chk input{width:auto}
-  #out{margin-top:26px}
-  .verdict{font-size:22px;font-weight:800;padding:14px 18px;border:2px solid;border-radius:10px;margin:14px 0;display:none}
-  .v-fraud{color:#ff5a52;border-color:#ff5a52}.v-anomaly{color:#febc2e;border-color:#febc2e}
-  .v-middleman{color:#febc2e;border-color:#febc2e}.v-clean{color:#28c840;border-color:#28c840}
-  .v-inconclusive{color:#8a8a8a;border-color:#8a8a8a}
-  table{border-collapse:collapse;width:100%;margin-top:10px}
-  td{border:1px solid #222;padding:8px 12px;font-size:13px}
-  tr td:first-child{color:#9fb0c3;width:38%}
-  a{color:#7aa2ff}
-  .note{font-size:12px;color:#8a8a8a;margin-top:22px;border-top:1px solid #222;padding-top:12px}
-  .mono{font-family:Consolas,monospace;font-size:12px;color:#9a9a9a}
-  .vbadge{font-size:12px;font-weight:700;padding:3px 10px;border:1.5px solid;border-radius:20px;white-space:nowrap}
-  h2.sec{font-size:18px;margin:34px 0 4px}
+  .presets{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .preset{flex:1;min-width:200px;border:1.5px dashed #c7d2fe;background:var(--accent-soft);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left}
+  .preset:hover{border-style:solid;background:#e4e9ff}
+  .preset b{display:block;font-size:14px;color:#3730a3}
+  .preset span{font-size:12.5px;color:var(--muted)}
+  button.primary{background:var(--accent);border:none;color:#fff;border-radius:10px;padding:13px 18px;font-size:15px;font-weight:600;cursor:pointer;margin-top:20px;width:100%}
+  button.primary:hover{background:#4338ca}
+  button.primary:disabled{opacity:.55;cursor:wait}
+  button.ghost{background:#fff;border:1.5px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 16px;font-size:14px;cursor:pointer;margin-top:8px}
+  button.ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .chk{display:flex;align-items:flex-start;gap:9px;margin-top:16px;font-size:13.5px;color:var(--muted)}
+  .chk input{width:auto;margin-top:3px}
+  #out{margin-top:6px}
+  .verdict{font-size:21px;font-weight:800;padding:15px 20px;border:2px solid;border-radius:14px;margin:16px 0;display:none;background:#fff}
+  .v-real{color:var(--green);border-color:var(--green);background:var(--green-bg)}
+  .v-unverified{color:var(--amber);border-color:var(--amber);background:var(--amber-bg)}
+  .v-suspicious{color:var(--orange);border-color:var(--orange);background:var(--orange-bg)}
+  .v-masked{color:var(--red);border-color:var(--red);background:var(--red-bg)}
+  .v-inconclusive{color:var(--gray);border-color:var(--gray);background:var(--gray-bg)}
+  .vbadge{font-size:12px;font-weight:700;padding:3px 11px;border:1.5px solid;border-radius:20px;white-space:nowrap;background:#fff}
+  table{border-collapse:collapse;width:100%;margin-top:10px;background:#fff;border-radius:10px;overflow:hidden}
+  td{border:1px solid var(--line);padding:9px 13px;font-size:13.5px}
+  tr td:first-child{color:var(--muted);width:38%;font-weight:600}
+  a{color:var(--accent)}
+  .mono{font-family:Consolas,monospace;font-size:12.5px;color:var(--muted)}
+  .legend{display:grid;gap:10px;margin-top:10px}
+  .legend .item{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .legend .item div b{font-size:14px}
+  .legend .item div p{margin:3px 0 0;font-size:13px;color:var(--muted);line-height:1.45}
+  .note{font-size:12.5px;color:var(--muted);margin-top:20px;border-top:1px solid var(--line);padding-top:14px;line-height:1.55}
+  .err{color:var(--red);font-weight:600}
 </style>
 </head>
 <body>
-<h1>🕵️ fake-llm-checker</h1>
-<p class="sub">Check whether a cheap third-party LLM API endpoint is a man-in-the-middle proxy.
-Your LLM key is used only for the scan and never stored.</p>
+<div class="wrap">
 
-<label>Service API key <span class="mono">(x-api-key for this service)</span></label>
-<input id="svc" type="password" placeholder="your fake-llm-checker service key" autocomplete="off">
+  <header class="hero">
+    <h1>🕵️ fake-llm-checker</h1>
+    <p>You bought a cheap API key. Is the model answering you the <b>real</b> one you paid for —
+    or a <b>masked</b> substitute? Run the probes and find out.</p>
+  </header>
 
-<label>Endpoint base URL</label>
-<input id="base" type="text" placeholder="https://cheap-api.example.com" autocomplete="off">
-
-<label>LLM API key <span class="mono">(the key you bought — sent only to that endpoint)</span></label>
-<input id="key" type="password" placeholder="sk-..." autocomplete="off">
-
-<div class="row">
-  <div>
-    <label>Model you paid for <span class="mono">(optional)</span></label>
-    <input id="model" type="text" placeholder="claude-opus-4-8" autocomplete="off">
+  <div class="card">
+    <h2>1 · Your access</h2>
+    <p class="desc">The key for <i>this</i> service (set as <span class="mono">SERVICE_API_KEY</span> where it's deployed).</p>
+    <input id="svc" type="password" placeholder="your fake-llm-checker service key" autocomplete="off">
   </div>
-  <div>
-    <label>Scan depth</label>
-    <select id="level">
-      <option value="quick">Quick — behavioural check only</option>
-      <option value="standard" selected>Standard — recon + behavioural check</option>
-      <option value="full">Full — adds model fingerprint + prompt extraction</option>
-    </select>
+
+  <div class="card">
+    <h2>2 · The endpoint to test</h2>
+    <p class="desc">Not sure what to type? Pick a preset — then paste the key the seller gave you.</p>
+    <div class="presets">
+      <button class="preset" onclick="preset('claude')">
+        <b>🟠 Claude-compatible</b>
+        <span>Fills in the official Anthropic endpoint + a Claude model name</span>
+      </button>
+      <button class="preset" onclick="preset('openai')">
+        <b>🟢 OpenAI-compatible</b>
+        <span>Fills in the official OpenAI endpoint + a GPT model name</span>
+      </button>
+    </div>
+
+    <label>Endpoint base URL</label>
+    <input id="base" type="text" placeholder="https://some-cheap-api.example.com" autocomplete="off">
+    <p class="help">The server address the seller told you to point your app at. Official ones are
+      <code>https://api.anthropic.com</code> and <code>https://api.openai.com</code> — anything else
+      is worth checking.</p>
+
+    <label>API key <span style="font-weight:400;color:var(--muted)">(the one you bought)</span></label>
+    <input id="key" type="password" placeholder="sk-..." autocomplete="off">
+    <p class="help">Only ever sent to <i>that</i> endpoint for the test itself. Never stored, never logged.</p>
+
+    <div class="row">
+      <div>
+        <label>Model you paid for</label>
+        <input id="model" type="text" placeholder="claude-opus-4-8" autocomplete="off">
+        <p class="help">The check compares this name against the model that actually answers.</p>
+      </div>
+      <div>
+        <label>Scan depth</label>
+        <select id="level">
+          <option value="quick">Quick — behaviour probes only</option>
+          <option value="standard" selected>Standard — adds infrastructure recon (free)</option>
+          <option value="full">Full — adds model fingerprinting (slower)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chk">
+      <input id="known" type="checkbox">
+      <span>I use this gateway on purpose (e.g. OpenRouter or my own proxy) — only judge whether the model is genuine.</span>
+    </div>
+
+    <button id="go" class="primary" onclick="start()">🔍 Check if the model is real</button>
+    <div id="out"></div>
   </div>
+
+  <div class="card">
+    <h2>How to read the result</h2>
+    <p class="desc">One question, five possible answers:</p>
+    <div class="legend">
+      <div class="item"><span class="vbadge v-real">🟢 REAL MODEL</span><div><b>The model is genuine.</b><p>It behaved exactly like the official model on every probe.</p></div></div>
+      <div class="item"><span class="vbadge v-unverified">🟡 MODEL UNVERIFIED</span><div><b>Can't confirm the model's identity.</b><p>Something sits between you and the provider, or the probes couldn't verify it. Whoever runs it sees all your traffic.</p></div></div>
+      <div class="item"><span class="vbadge v-suspicious">🟠 POSSIBLY MASKED</span><div><b>One suspicious signal.</b><p>Something doesn't look like the genuine model. Re-run to rule out a fluke before acting.</p></div></div>
+      <div class="item"><span class="vbadge v-masked">🔴 MASKED MODEL</span><div><b>You're not getting what you paid for.</b><p>Multiple independent signals: model substitution, a hijacked system prompt, or a fabricated API.</p></div></div>
+      <div class="item"><span class="vbadge v-inconclusive">⚪ INCONCLUSIVE</span><div><b>No verdict possible.</b><p>Usually means the key was rejected — the probes never got to run. Check the key and try again.</p></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Scan history</h2>
+    <p class="desc">Past scans on this instance.</p>
+    <button id="histbtn" class="ghost" onclick="loadHistory()">Load history</button>
+    <div id="hist" style="margin-top:12px"></div>
+  </div>
+
+  <p class="note"><b>Honest limits:</b> a passing score is not a safety certificate. These probes cannot
+  detect an endpoint that serves the real model while quietly logging your prompts — the only fully
+  safe rule is the official endpoint with an official key. Never route code, secrets, or personal
+  data through a discounted base URL.</p>
+
 </div>
 
-<div class="chk"><input id="known" type="checkbox"><span>I use this gateway on purpose (e.g. OpenRouter / my own LiteLLM) — judge malice only</span></div>
-
-<button id="go" onclick="start()">Run the check</button>
-
-<div id="out"></div>
-
-<h2 class="sec">Scan history</h2>
-<p class="sub">Past scans on this instance (uses the service API key above).</p>
-<button id="histbtn" onclick="loadHistory()" style="width:auto;margin-top:4px">Load history</button>
-<div id="hist" style="margin-top:12px"></div>
-
-<p class="note">Limits of the scan engine: a passing score is not a safety certificate —
-it cannot detect a proxy that forwards your prompt untouched while logging it. Never route code,
-secrets or personal data through a non-official endpoint.</p>
-
 <script>
-let timer = null;
+let timer = null, histLoaded = false;
 const $ = (id) => document.getElementById(id);
-const NAMES = {fraud:'🔴 FRAUDULENT BEHAVIOUR', anomaly:'🟠 ANOMALIES DETECTED',
-  middleman:'🟡 UNDECLARED MIDDLEMAN', clean:'🟢 CLEAN', inconclusive:'⚪ INCONCLUSIVE'};
+const NAMES = {real:'🟢 REAL MODEL', unverified:'🟡 MODEL UNVERIFIED', suspicious:'🟠 POSSIBLY MASKED',
+  masked:'🔴 MASKED MODEL', inconclusive:'⚪ INCONCLUSIVE'};
+
+function preset(which) {
+  if (which === 'claude') {
+    $('base').value = 'https://api.anthropic.com';
+    $('model').value = 'claude-opus-4-8';
+  } else {
+    $('base').value = 'https://api.openai.com';
+    $('model').value = 'gpt-4o';
+  }
+  $('base').focus();
+}
 
 async function start() {
   const svc = $('svc').value.trim();
-  if (!svc) { alert('Enter your service API key first.'); return; }
+  if (!svc) { alert('Enter your service API key first (section 1).'); return; }
+  if (!$('base').value.trim() || !$('key').value) { alert('Fill in the endpoint URL and the API key you bought.'); return; }
   $('go').disabled = true;
-  $('out').innerHTML = '<p class="mono">Scan queued…</p>';
+  $('out').innerHTML = '<p class="mono">Scan queued — this usually takes under a minute…</p>';
   try {
     const r = await fetch('/api/checks', {
       method: 'POST',
@@ -100,7 +189,7 @@ async function start() {
     if (!r.ok) throw new Error(j.error || r.statusText);
     poll(svc, j.id);
   } catch (e) {
-    $('out').innerHTML = '<p style="color:#ff5a52">Error: ' + esc(e.message) + '</p>';
+    $('out').innerHTML = '<p class="err">Error: ' + esc(e.message) + '</p>';
     $('go').disabled = false;
   }
 }
@@ -120,7 +209,7 @@ async function poll(svc, id) {
       }
     } catch (e) {
       clearInterval(timer);
-      $('out').innerHTML = '<p style="color:#ff5a52">Error: ' + esc(e.message) + '</p>';
+      $('out').innerHTML = '<p class="err">Error: ' + esc(e.message) + '</p>';
       $('go').disabled = false;
     }
   }, 4000);
@@ -129,28 +218,25 @@ async function poll(svc, id) {
 function render(j) {
   let h = '<p class="mono">status: ' + esc(j.status) + ' · id: ' + esc(j.id) + '</p>';
   if (j.verdict) {
-    h += '<div class="verdict v-' + esc(j.verdict) + '" style="display:block">' + NAMES[j.verdict] + '</div>';
+    h += '<div class="verdict v-' + esc(j.verdict) + '" style="display:block">' + esc(NAMES[j.verdict] || j.verdict) + '</div>';
     h += '<table>'
-      + row('Malicious signals', j.malice ?? '—')
-      + row('Third party interposed', j.interposed === 1 ? 'yes' : (j.interposed === 0 ? 'no' : '—'))
-      + row('Recon risk signals', j.reconSignals ?? '— (context only)')
+      + row('Masking signals', j.malice ?? '—')
+      + row('Extra server in the route', j.gateway === 1 ? 'yes' : (j.gateway === 0 ? 'no' : '—'))
+      + row('Infrastructure risk signals', j.reconSignals ?? '— (context only)')
       + (j.summary && j.summary.fingerprint
-          ? row('Fingerprint', j.summary.fingerprint.pass + '/' + j.summary.fingerprint.tot +
-              ' probes' + (j.summary.fingerprint.foreign ? ' · <b>foreign infrastructure</b>' : ''))
+          ? row('Model fingerprint', j.summary.fingerprint.pass + '/' + j.summary.fingerprint.tot +
+              ' probes passed' + (j.summary.fingerprint.foreign ? ' · <b>runs on foreign machines</b>' : ''))
           : '')
       + '</table>';
-    if (j.reportUrl) h += '<p><a href="' + esc(j.reportUrl) + '" target="_blank">Open full evidence report (HTML)</a></p>';
+    if (j.reportUrl) h += '<p><a href="' + esc(j.reportUrl) + '" target="_blank">📄 Open the full evidence report</a></p>';
   }
-  if (j.error) h += '<p style="color:#ff5a52">' + esc(j.error) + '</p>';
+  if (j.error) h += '<p class="err">' + esc(j.error) + '</p>';
   $('out').innerHTML = h;
 }
-function row(k, v) { return '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>'; }
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-let histLoaded = false;
 async function loadHistory() {
   const svc = $('svc').value.trim();
-  if (!svc) { alert('Enter your service API key first.'); return; }
+  if (!svc) { alert('Enter your service API key first (section 1).'); return; }
   $('hist').innerHTML = '<p class="mono">Loading…</p>';
   try {
     const r = await fetch('/api/checks', {headers:{'x-api-key': svc}});
@@ -169,9 +255,10 @@ async function loadHistory() {
     }
     $('hist').innerHTML = h + '</table>';
   } catch (e) {
-    $('hist').innerHTML = '<p style="color:#ff5a52">Error: ' + esc(e.message) + '</p>';
+    $('hist').innerHTML = '<p class="err">Error: ' + esc(e.message) + '</p>';
   }
 }
+
 async function viewCheck(id) {
   const svc = $('svc').value.trim();
   try {
@@ -179,11 +266,14 @@ async function viewCheck(id) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.statusText);
     render(j);
-    document.getElementById('out').scrollIntoView({behavior:'smooth'});
+    document.getElementById('out').scrollIntoView({behavior:'smooth', block:'center'});
   } catch (e) {
     alert('Could not load check: ' + e.message);
   }
 }
+
+function row(k, v) { return '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>'; }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 </script>
 </body>
 </html>

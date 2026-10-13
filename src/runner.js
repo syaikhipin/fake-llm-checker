@@ -45,7 +45,7 @@ async function runJob(job) {
     const parsed = scanner.parseTranscript(transcript);
     // Dead-key guard: if the endpoint rejected the key outright (401/403 on the
     // very first live probe), none of the behavioural probes could run and any
-    // "middleman" verdict would be a false positive. Say so explicitly.
+    // non-clean verdict would be a false positive. Say so explicitly.
     const deadKey = /Endpoint returned HTTP (401|403)/.test(transcript) && parsed.malice === 0;
     if (deadKey) {
       parsed.verdict = 'inconclusive';
@@ -58,13 +58,13 @@ async function runJob(job) {
       db.finish(job.id, 'error', { error: `scanner failed to start: ${spawnError}` });
     } else if (timedOut) {
       db.finish(job.id, 'timeout', {
-        verdict: parsed.verdict, malice: parsed.malice, interposed: parsed.interposed,
+        verdict: parsed.verdict, malice: parsed.malice, interposed: parsed.gateway,
         reconSignals: parsed.reconSignals, summary, reportPath,
         error: `scan exceeded ${scanner.TIMEOUT_MS}ms and was killed; partial results above`,
       });
     } else {
       db.finish(job.id, 'done', {
-        verdict: parsed.verdict, malice: parsed.malice, interposed: parsed.interposed,
+        verdict: parsed.verdict, malice: parsed.malice, interposed: parsed.gateway,
         reconSignals: parsed.reconSignals, summary, reportPath,
         error: deadKey
           ? 'the endpoint rejected the LLM key (HTTP 401/403): behavioural probes could not run — re-submit with a working key'
