@@ -1,0 +1,16 @@
+# Render free-tier deploy (Blueprint). One Docker web service; SQLite lives on
+# ephemeral disk (fine for a demo — results vanish on redeploy; bring a disk or
+# external Postgres if you need persistence).
+services:
+  - type: web
+    name: fake-llm-checker
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: SERVICE_API_KEY
+        sync: false # set in the Render dashboard (generate a long random string)
+      - key: DATA_DIR
+        value: /data
+      - key: MAX_CONCURRENT_SCANS
+        value: "1"

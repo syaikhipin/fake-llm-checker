@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fake-llm-checker — is that cheap LLM API a scam proxy?</title>
+<style>
+  body{background:#0c0c0c;color:#d6d6d6;font-family:Segoe UI,system-ui,sans-serif;max-width:760px;margin:0 auto;padding:32px 20px}
+  h1{font-size:24px} p.sub{color:#8a8a8a;font-size:14px}
+  label{display:block;margin:14px 0 4px;font-size:13px;color:#9fb0c3}
+  input,select{width:100%;box-sizing:border-box;background:#141414;border:1px solid #2a2a2a;color:#e6e6e6;border-radius:8px;padding:10px 12px;font-size:14px}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  button{background:#2f6fed;border:none;color:#fff;border-radius:8px;padding:12px 18px;font-size:15px;cursor:pointer;margin-top:18px;width:100%}
+  button:disabled{opacity:.5;cursor:wait}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px}
+  .chk input{width:auto}
+  #out{margin-top:26px}
+  .verdict{font-size:22px;font-weight:800;padding:14px 18px;border:2px solid;border-radius:10px;margin:14px 0;display:none}
+  .v-fraud{color:#ff5a52;border-color:#ff5a52}.v-anomaly{color:#febc2e;border-color:#febc2e}
+  .v-middleman{color:#febc2e;border-color:#febc2e}.v-clean{color:#28c840;border-color:#28c840}
+  .v-inconclusive{color:#8a8a8a;border-color:#8a8a8a}
+  table{border-collapse:collapse;width:100%;margin-top:10px}
+  td{border:1px solid #222;padding:8px 12px;font-size:13px}
+  tr td:first-child{color:#9fb0c3;width:38%}
+  a{color:#7aa2ff}
+  .note{font-size:12px;color:#8a8a8a;margin-top:22px;border-top:1px solid #222;padding-top:12px}
+  .mono{font-family:Consolas,monospace;font-size:12px;color:#9a9a9a}
+</style>
+</head>
+<body>
+<h1>🕵️ fake-llm-checker</h1>
+<p class="sub">Check whether a cheap third-party LLM API endpoint is a man-in-the-middle proxy.
+Powered by <a href="https://github.com/astrozeta/api-scam-hunter">APIScamHunter</a> (MIT).
+Your LLM key is used only for the scan and never stored.</p>
+
+<label>Service API key <span class="mono">(x-api-key for this service)</span></label>
+<input id="svc" type="password" placeholder="your fake-llm-checker service key" autocomplete="off">
+
+<label>Endpoint base URL</label>
+<input id="base" type="text" placeholder="https://cheap-api.example.com" autocomplete="off">
+
+<label>LLM API key <span class="mono">(the key you bought — sent only to that endpoint)</span></label>
+<input id="key" type="password" placeholder="sk-..." autocomplete="off">
+
+<div class="row">
+  <div>
+    <label>Model you paid for <span class="mono">(optional)</span></label>
+    <input id="model" type="text" placeholder="claude-opus-4-8" autocomplete="off">
+  </div>
+  <div>
+    <label>Scan depth</label>
+    <select id="level">
+      <option value="quick">Quick — behavioural check only</option>
+      <option value="standard" selected>Standard — recon + behavioural check</option>
+      <option value="full">Full — adds model fingerprint + prompt extraction</option>
+    </select>
+  </div>
+</div>
+
+<div class="chk"><input id="known" type="checkbox"><span>I use this gateway on purpose (e.g. OpenRouter / my own LiteLLM) — judge malice only</span></div>
+
+<button id="go" onclick="start()">Run the check</button>
+
+<div id="out"></div>
+
+<p class="note">Limits, inherited from APIScamHunter: a passing score is not a safety certificate —
+it cannot detect a proxy that forwards your prompt untouched while logging it. Never route code,
+secrets or personal data through a non-official endpoint.</p>
+
+<script>
+let timer = null;
+const $ = (id) => document.getElementById(id);
+const NAMES = {fraud:'🔴 FRAUDULENT BEHAVIOUR', anomaly:'🟠 ANOMALIES DETECTED',
+  middleman:'🟡 UNDECLARED MIDDLEMAN', clean:'🟢 CLEAN', inconclusive:'⚪ INCONCLUSIVE'};
+
+async function start() {
+  const svc = $('svc').value.trim();
+  if (!svc) { alert('Enter your service API key first.'); return; }
+  $('go').disabled = true;
+  $('out').innerHTML = '<p class="mono">Scan queued…</p>';
+  try {
+    const r = await fetch('/api/checks', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','x-api-key': svc},
+      body: JSON.stringify({
+        baseUrl: $('base').value.trim(),
+        apiKey: $('key').value,
+        model: $('model').value.trim() || undefined,
+        level: $('level').value,
+        known: $('known').checked,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    poll(svc, j.id);
+  } catch (e) {
+    $('out').innerHTML = '<p style="color:#ff5a52">Error: ' + esc(e.message) + '</p>';
+    $('go').disabled = false;
+  }
+}
+
+async function poll(svc, id) {
+  clearInterval(timer);
+  timer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/checks/' + id, {headers:{'x-api-key': svc}});
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.statusText);
+      render(j);
+      if (['done','error','timeout'].includes(j.status)) {
+        clearInterval(timer);
+        $('go').disabled = false;
+      }
+    } catch (e) {
+      clearInterval(timer);
+      $('out').innerHTML = '<p style="color:#ff5a52">Error: ' + esc(e.message) + '</p>';
+      $('go').disabled = false;
+    }
+  }, 4000);
+}
+
+function render(j) {
+  let h = '<p class="mono">status: ' + esc(j.status) + ' · id: ' + esc(j.id) + '</p>';
+  if (j.verdict) {
+    h += '<div class="verdict v-' + esc(j.verdict) + '" style="display:block">' + NAMES[j.verdict] + '</div>';
+    h += '<table>'
+      + row('Malicious signals', j.malice ?? '—')
+      + row('Third party interposed', j.interposed === 1 ? 'yes' : (j.interposed === 0 ? 'no' : '—'))
+      + row('Recon risk signals', j.reconSignals ?? '— (context only)')
+      + (j.summary && j.summary.fingerprint
+          ? row('Fingerprint', j.summary.fingerprint.pass + '/' + j.summary.fingerprint.tot +
+              ' probes' + (j.summary.fingerprint.foreign ? ' · <b>foreign infrastructure</b>' : ''))
+          : '')
+      + '</table>';
+    if (j.reportUrl) h += '<p><a href="' + esc(j.reportUrl) + '" target="_blank">Open full evidence report (HTML)</a></p>';
+  }
+  if (j.error) h += '<p style="color:#ff5a52">' + esc(j.error) + '</p>';
+  $('out').innerHTML = h;
+}
+function row(k, v) { return '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>'; }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+</script>
+</body>
+</html>
