@@ -36,6 +36,15 @@ else MODEL="$MODEL_IN"; fi
 CORE=$(echo "$MODEL" | grep -oiE 'opus|sonnet|haiku|gpt-[0-9a-z.\-]+' | head -1)
 [ -z "$CORE" ] && CORE="$MODEL"
 
+# Zhipu (z.ai / bigmodel.cn) speaks the OpenAI API shape but mounts it at
+# $BASE/chat/completions and $BASE/models (no /v1 segment).
+if echo "$BASE" | grep -qiE '[/.]z\.ai[/:]|bigmodel\.cn'; then
+  [ "$PROVIDER" = "anthropic" ] || PROVIDER="openai"
+  V1=""; NATIVE_ID=1
+else
+  V1="/v1"; NATIVE_ID=0
+fi
+
 interposed=0; malice=0
 bad(){ malice=$((malice+1)); echo "  ${RED}[X] $1${NC}"; }
 mid(){ echo "  ${YEL}[?] $1${NC}"; }
@@ -56,13 +65,13 @@ except Exception: pass" 2>/dev/null
 # provider-specific request shapes
 if [ "$PROVIDER" = "openai" ]; then
   AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE/v1/chat/completions"; IDPFX="chatcmpl-"
+  ENDPOINT="$BASE$V1/chat/completions"; if [ "$NATIVE_ID" = 1 ]; then IDPFX=""; else IDPFX="chatcmpl-"; fi
   body(){ if [ -n "$1" ]; then printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"system","content":"%s"},{"role":"user","content":"%s"}]}' "$3" "$4" "$1" "$2"
     else printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$2"; fi; }
   gettext(){ jget "$1" "choices.0.message.content"; }
 else
   AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE/v1/messages"; IDPFX="msg_"
+  ENDPOINT="$BASE$V1/messages"; IDPFX="msg_"
   body(){ if [ -n "$1" ]; then printf '{"model":"%s","max_tokens":%s,"system":"%s","messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$1" "$2"
     else printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$2"; fi; }
   gettext(){ jget "$1" "content.0.text"; }
@@ -86,7 +95,7 @@ echo "Key      : ${KEY:0:8}...  Requested model: $MODEL"
 
 echo; echo "[0] Static checks"
 case "$BASE" in
-  *api.anthropic.com*|*api.openai.com*) ok "Official domain." ;;
+  *api.anthropic.com*|*api.openai.com*|*api.z.ai*|*bigmodel.cn*) ok "Official domain." ;;
   *) if [ "$KNOWN" = "1" ]; then mid "Non-official domain (expected: you declared a gateway)."
      else interposed=1; mid "Base URL is NOT an official domain -> the model's identity cannot be verified as genuine."; fi ;;
 esac
@@ -109,7 +118,11 @@ if is2xx; then
   if [ "$MISS" -ge 3 ]; then
     bad "FABRICATED STUB: a 200 missing $MISS/5 canonical fields ($MISSF ). The endpoint is not serving a real model -- it returns a canned payload (often anti-analysis, e.g. 'Please use Claude Code CLI')."
   else
-    echo "$BODY" | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$IDPFX" && ok "Native '$IDPFX' id present." || { interposed=1; mid "Response missing the '$IDPFX...' id the real API returns -> response was rewritten; cannot confirm the genuine model."; }
+    if [ -n "$IDPFX" ]; then
+      echo "$BODY" | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$IDPFX" && ok "Native '$IDPFX' id present." || { interposed=1; mid "Response missing the '$IDPFX...' id the real API returns -> response was rewritten; cannot confirm the genuine model."; }
+    else
+      echo "$BODY" | grep -qE "\"id\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" && ok "Response carries a provider-native id." || { interposed=1; mid "Response has no id at all -> rewritten or stubbed response."; }
+    fi
     SERVED=$(jget "$BODY" "model")
     if [ -n "$SERVED" ]; then
       if echo "$SERVED" | grep -qi "$CORE"; then ok "Served model '$SERVED' matches the '$CORE' family you requested."
@@ -135,8 +148,8 @@ if is2xx; then
   fi
 else inf "Skipped (HTTP ${STATUS} -- likely auth/balance, can't judge)."; fi
 
-echo; echo "[3] Model catalog audit (/v1/models)"
-req GET "$BASE/v1/models"
+echo; echo "[3] Model catalog audit (/models)"
+req GET "$BASE$V1/models"
 if is2xx; then
   # real Anthropic uses created_at (ISO); one-api/new-api proxies use created (unix). Check both.
   STAMPS=$(echo "$BODY" | grep -oE '"created(_at)?":("?[^",}]*"?)')
@@ -164,7 +177,7 @@ else inf "Streaming check targets the Anthropic SSE schema; skipped for OpenAI."
 
 echo; echo "[6] Token-count endpoint (/v1/messages/count_tokens)"
 if [ "$PROVIDER" = "anthropic" ]; then
-  req POST "$BASE/v1/messages/count_tokens" "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"The quick brown fox jumps over the lazy dog.\"}]}"
+  req POST "$BASE$V1/messages/count_tokens" "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"The quick brown fox jumps over the lazy dog.\"}]}"
   if is2xx && echo "$BODY" | grep -qE '"input_tokens"[[:space:]]*:[[:space:]]*[0-9]+'; then
     it=$(echo "$BODY" | grep -oE '"input_tokens"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1)
     if [ "${it:-0}" -ge 5 ] && [ "${it:-0}" -le 40 ]; then ok "count_tokens works and returns a plausible count ($it for a 9-word sentence)."
@@ -202,7 +215,7 @@ if [ "$malice" -ge 1 ]; then
   echo "${RED}Do NOT send code, secrets or personal data. Collect evidence and dispute.${NC}"
 elif [ "$interposed" = "1" ]; then
   if [ "$KNOWN" = "1" ]; then echo "${YEL}A gateway is in the route (you declared it) and the model behaved like the genuine one in these probes.${NC}"
-  else echo "${YEL}MODEL UNVERIFIED: the endpoint doesn't behave like the official API, so the model's identity can't be confirmed.${NC}"
+  else echo "${YEL}MODEL UNVERIFIED: this is not the provider's official endpoint, so the model's identity can't be fully confirmed.${NC}"
        echo "${YEL}No model-swap was caught here, but whoever runs it still SEES every byte you send.${NC}"; fi
   echo "${DIM}Note: these probes can't detect an endpoint that serves the real model while quietly logging your prompts. The only safe rule is the official endpoint.${NC}"
 else

@@ -33,13 +33,18 @@ CREATE TABLE IF NOT EXISTS checks (
 );
 CREATE INDEX IF NOT EXISTS idx_checks_status ON checks(status, created_at);
 `);
+// Provider hint added after launch; migrate existing databases in place.
+const _cols = db.prepare('PRAGMA table_info(checks)').all().map(c => c.name);
+if (!_cols.includes('provider')) {
+  db.exec("ALTER TABLE checks ADD COLUMN provider TEXT NOT NULL DEFAULT 'auto'");
+}
 
 const now = () => new Date().toISOString();
 
 const q = {
   create: db.prepare(`INSERT INTO checks
-    (id, created_at, status, base_url, model, level, price, tier, known)
-    VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?)`),
+    (id, created_at, status, base_url, model, level, price, tier, known, provider)
+    VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`),
   claim: db.prepare(`
     UPDATE checks SET status='running', started_at=?
     WHERE id = (SELECT id FROM checks WHERE status='queued' ORDER BY created_at LIMIT 1)
@@ -68,8 +73,9 @@ function publicRow(r) {
 
 module.exports = {
   REPORTS_DIR,
-  create(id, { baseUrl, model, level, price, tier, known }) {
-    q.create.run(id, now(), baseUrl, model || null, level, price ?? null, tier || null, known ? 1 : 0);
+  create(id, { baseUrl, model, level, price, tier, known, provider }) {
+    q.create.run(id, now(), baseUrl, model || null, level, price ?? null, tier || null,
+      known ? 1 : 0, provider || 'auto');
     return publicRow(q.get.get(id));
   },
   claimNext() { return q.claim.get(now()) || null; },

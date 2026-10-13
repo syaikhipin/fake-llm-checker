@@ -55,12 +55,15 @@ app.get('/healthz', (req, res) => res.json({ ok: true, service: 'fake-llm-checke
 
 app.post('/api/checks', rateLimit, async (req, res) => {
   try {
-    const { baseUrl, apiKey, model, level = 'standard', price, tier, known } = req.body || {};
+    const { baseUrl, apiKey, model, level = 'standard', provider = 'auto', price, tier, known } = req.body || {};
     if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 8) {
       return res.status(400).json({ error: 'apiKey (the LLM key to test) is required' });
     }
     if (!LEVELS.includes(level)) {
       return res.status(400).json({ error: `level must be one of ${LEVELS.join('|')}` });
+    }
+    if (!['auto', 'openai', 'anthropic'].includes(provider)) {
+      return res.status(400).json({ error: 'provider must be one of auto|openai|anthropic' });
     }
     const cleanUrl = await assertPublicUrl(baseUrl);
     if (db.activeCount() >= MAX_ACTIVE_PER_KEY) {
@@ -74,6 +77,7 @@ app.post('/api/checks', rateLimit, async (req, res) => {
       price: price === undefined ? undefined : Number(price) || 0,
       tier: typeof tier === 'string' ? tier.slice(0, 20) : undefined,
       known: !!known,
+      provider,
     });
     runner.submitKey(id, apiKey); // memory only — never persisted
     res.status(202).json({ id, status: row.status, pollUrl: `/api/checks/${id}` });

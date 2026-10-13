@@ -50,11 +50,13 @@ function findReportHtml(jobDir) {
 // The user's LLM key travels via env (ANTHROPIC_API_KEY fallback in the script),
 // never as argv, so it doesn't show in `ps` listings. It is dropped from memory
 // by the runner as soon as the scan ends.
-function runScan({ baseUrl, apiKey, model, level, price, tier, known, jobDir }) {
+function runScan({ baseUrl, apiKey, model, level, provider, price, tier, known, jobDir }) {
   return new Promise((resolve) => {
     const env = {
       ...process.env,
       ANTHROPIC_API_KEY: apiKey,
+      // Explicit provider choice overrides the engine's auto-detection.
+      ...(provider && provider !== 'auto' ? { PROVIDER: provider } : {}),
       OUTDIR: jobDir,
       QUICK: level === 'quick' ? '1' : '0',
       FULL: level === 'full' ? '1' : '0',

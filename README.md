@@ -27,6 +27,10 @@ browser ──POST /api/checks──▶ Express API ──SQLite queue──▶ 
 - **SSRF guard**: the target hostname must resolve to a public IP (no localhost,
   private ranges, or `169.254.x.x` metadata).
 - **Rate limiting**: 60 requests/minute per IP, plus a cap on concurrent scans.
+- **Provider choice**: the UI offers OpenAI-compatible vs Claude-compatible endpoints.
+  OpenAI-style bases usually end with `/v1` (e.g. `https://api.openai.com/v1`); the UI
+  strips one trailing `/v1` and the engine appends `/chat/completions`. Claude-style
+  bases are the bare host (`https://api.anthropic.com`); the engine appends `/v1/messages`.
 
 ## Quickstart (local, Docker)
 
@@ -79,11 +83,16 @@ Example:
 
 ```bash
 curl -s -H 'Content-Type: application/json' \
-  -d '{"baseUrl":"https://cheap-api.example.com","apiKey":"sk-...","level":"quick"}' \
+  -d '{"baseUrl":"https://api.z.ai/api/coding/paas/v4","apiKey":"sk-...","provider":"openai","level":"quick"}' \
   http://localhost:3000/api/checks
 # → {"id":"...","status":"queued","pollUrl":"/api/checks/..."}
 curl -s http://localhost:3000/api/checks/<id>
 ```
+
+`provider` is `auto` (default) | `openai` | `anthropic`. The UI offers an
+OpenAI-compatible / Claude choice: OpenAI-style endpoints use
+`$BASE/v1/chat/completions` (Zhipu `z.ai`/`bigmodel.cn` use `$BASE/chat/completions`,
+no `/v1`), Claude-style use `$BASE/v1/messages`.
 
 ## Dead keys don't produce verdicts
 

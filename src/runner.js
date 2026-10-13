@@ -36,6 +36,7 @@ async function runJob(job) {
       apiKey: key,
       model: job.model,
       level: job.level,
+      provider: job.provider || 'auto',
       price: job.price,
       tier: job.tier,
       known: job.known === 1,

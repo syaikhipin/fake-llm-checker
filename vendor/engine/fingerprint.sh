@@ -29,6 +29,15 @@ if [ "$PROVIDER" = "auto" ]; then
 fi
 if [ -z "$MODEL_IN" ]; then [ "$PROVIDER" = "openai" ] && MODEL="gpt-4o" || MODEL="claude-opus-4-8"; else MODEL="$MODEL_IN"; fi
 
+# Zhipu (z.ai / bigmodel.cn) speaks the OpenAI API shape but mounts it at
+# $BASE/chat/completions and $BASE/models (no /v1 segment).
+if echo "$BASE" | grep -qiE '[/.]z\.ai[/:]|bigmodel\.cn'; then
+  [ "$PROVIDER" = "anthropic" ] || PROVIDER="openai"
+  V1=""
+else
+  V1="/v1"
+fi
+
 bad(){ echo "  ${RED}[X] $1${NC}"; }
 ok(){  echo "  ${GRN}[ok] $1${NC}"; }
 inf(){ echo "  ${DIM}[i] $1${NC}"; }
@@ -43,11 +52,11 @@ except Exception: pass" 2>/dev/null; fi; }
 
 if [ "$PROVIDER" = "openai" ]; then
   AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE/v1/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "model" "choices" "usage"'
+  ENDPOINT="$BASE$V1/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "model" "choices" "usage"'
   mkbody(){ printf '{"model":"%s","max_tokens":%s,"temperature":0,"messages":[{"role":"user","content":%s}]}' "$MODEL" "$2" "$(jstr "$1")"; }
 else
   AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE/v1/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "model" "stop_reason" "usage"'
+  ENDPOINT="$BASE$V1/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "model" "stop_reason" "usage"'
   mkbody(){ printf '{"model":"%s","max_tokens":%s,"temperature":0,"messages":[{"role":"user","content":%s}]}' "$MODEL" "$2" "$(jstr "$1")"; }
 fi
 

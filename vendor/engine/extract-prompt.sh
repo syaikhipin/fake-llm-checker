@@ -29,12 +29,21 @@ fi
 if [ -z "$MODEL_IN" ]; then [ "$PROVIDER" = "openai" ] && MODEL="gpt-4o" || MODEL="claude-opus-4-8"; else MODEL="$MODEL_IN"; fi
 OUT="${OUT:-scam-evidence-$(date +%Y%m%d-%H%M%S).txt}"
 
+# Zhipu (z.ai / bigmodel.cn) speaks the OpenAI API shape but mounts it at
+# $BASE/chat/completions and $BASE/models (no /v1 segment).
+if echo "$BASE" | grep -qiE '[/.]z\.ai[/:]|bigmodel\.cn'; then
+  [ "$PROVIDER" = "anthropic" ] || PROVIDER="openai"
+  V1=""
+else
+  V1="/v1"
+fi
+
 if [ "$PROVIDER" = "openai" ]; then
   AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE/v1/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "choices" "usage"'
+  ENDPOINT="$BASE$V1/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "choices" "usage"'
 else
   AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
-  ENDPOINT="$BASE/v1/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "stop_reason" "usage"'
+  ENDPOINT="$BASE$V1/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "stop_reason" "usage"'
 fi
 jstr(){ if command -v python3 >/dev/null 2>&1; then printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))'; else printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g;s/"/\\"/g')"; fi; }
 jget(){ if command -v python3 >/dev/null 2>&1; then echo "$1" | python3 -c "import sys,json

@@ -30,6 +30,7 @@
   .presets{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
   .preset{flex:1;min-width:200px;border:1.5px dashed #c7d2fe;background:var(--accent-soft);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left}
   .preset:hover{border-style:solid;background:#e4e9ff}
+  .preset.selected{border-style:solid;background:#e0e7ff;box-shadow:0 0 0 2px #818cf8}
   .preset b{display:block;font-size:14px;color:#3730a3}
   .preset span{font-size:12.5px;color:var(--muted)}
   button.primary{background:var(--accent);border:none;color:#fff;border-radius:10px;padding:13px 18px;font-size:15px;font-weight:600;cursor:pointer;margin-top:20px;width:100%}
@@ -71,23 +72,21 @@
 
   <div class="card">
     <h2>1 · The endpoint to test</h2>
-    <p class="desc">Not sure what to type? Pick a preset — then paste the key the seller gave you.</p>
+    <p class="desc">Which API style does the endpoint speak? This decides how the checker talks to it.</p>
     <div class="presets">
-      <button class="preset" onclick="preset('claude')">
-        <b>🟠 Claude-compatible</b>
-        <span>Fills in the official Anthropic endpoint + a Claude model name</span>
-      </button>
-      <button class="preset" onclick="preset('openai')">
+      <button class="preset" data-provider="openai" onclick="setProvider('openai', true)">
         <b>🟢 OpenAI-compatible</b>
-        <span>Fills in the official OpenAI endpoint + a GPT model name</span>
+        <span>Uses <code>/v1/chat/completions</code> — OpenAI, Zhipu, DeepSeek, most resellers</span>
+      </button>
+      <button class="preset" data-provider="anthropic" onclick="setProvider('anthropic', true)">
+        <b>🟠 Claude (Anthropic)</b>
+        <span>Uses <code>/v1/messages</code> — the official Anthropic API shape</span>
       </button>
     </div>
 
     <label>Endpoint base URL</label>
-    <input id="base" type="text" placeholder="https://some-cheap-api.example.com" autocomplete="off">
-    <p class="help">The server address the seller told you to point your app at. Official ones are
-      <code>https://api.anthropic.com</code> and <code>https://api.openai.com</code> — anything else
-      is worth checking.</p>
+    <input id="base" type="text" placeholder="https://api.openai.com/v1" autocomplete="off">
+    <p class="help" id="baseHelp"></p>
 
     <label>API key <span style="font-weight:400;color:var(--muted)">(the one you bought)</span></label>
     <input id="key" type="password" placeholder="sk-..." autocomplete="off">
@@ -96,7 +95,7 @@
     <div class="row">
       <div>
         <label>Model you paid for</label>
-        <input id="model" type="text" placeholder="claude-opus-4-8" autocomplete="off">
+        <input id="model" type="text" placeholder="gpt-4o" autocomplete="off">
         <p class="help">The check compares this name against the model that actually answers.</p>
       </div>
       <div>
@@ -150,15 +149,33 @@ const $ = (id) => document.getElementById(id);
 const NAMES = {real:'🟢 REAL MODEL', unverified:'🟡 MODEL UNVERIFIED', suspicious:'🟠 POSSIBLY MASKED',
   masked:'🔴 MASKED MODEL', inconclusive:'⚪ INCONCLUSIVE'};
 
-function preset(which) {
-  if (which === 'claude') {
-    $('base').value = 'https://api.anthropic.com';
-    $('model').value = 'claude-opus-4-8';
+// Provider choice drives the request shape the checker uses.
+// OpenAI shape: base + /chat/completions (base usually ends with /v1).
+// Claude shape:  base + /messages (base is the bare host, e.g. api.anthropic.com).
+let provider = 'openai';
+function setProvider(p, fill) {
+  provider = p;
+  document.querySelectorAll('.preset').forEach(el => el.classList.toggle('selected', el.dataset.provider === p));
+  const base = $('base'), model = $('model');
+  if (p === 'openai') {
+    base.placeholder = 'https://api.openai.com/v1';
+    model.placeholder = 'gpt-4o';
+    $('baseHelp').innerHTML = 'Paste the base exactly as given — a trailing <code>/v1</code> is fine, e.g. ' +
+      '<code>https://api.openai.com/v1</code> (Zhipu: <code>https://api.z.ai/api/coding/paas/v4</code>). ' +
+      'The <code>/chat/completions</code> part is added for you.';
+    if (fill) { base.value = 'https://api.openai.com/v1'; model.value = 'gpt-4o'; }
   } else {
-    $('base').value = 'https://api.openai.com';
-    $('model').value = 'gpt-4o';
+    base.placeholder = 'https://api.anthropic.com';
+    model.placeholder = 'claude-opus-4-8';
+    $('baseHelp').innerHTML = 'The base is just the host, e.g. <code>https://api.anthropic.com</code> — no path. ' +
+      'The <code>/v1/messages</code> part is added for you.';
+    if (fill) { base.value = 'https://api.anthropic.com'; model.value = 'claude-opus-4-8'; }
   }
-  $('base').focus();
+}
+// Forgiving normalization: trim, drop trailing slashes, drop one trailing /v1
+// (so https://api.openai.com/v1 and https://api.openai.com both work).
+function normalizeBase(u) {
+  return u.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
 }
 
 async function start() {
@@ -170,10 +187,11 @@ async function start() {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        baseUrl: $('base').value.trim(),
+        baseUrl: normalizeBase($('base').value),
         apiKey: $('key').value,
         model: $('model').value.trim() || undefined,
         level: $('level').value,
+        provider,
         known: $('known').checked,
       }),
     });
@@ -263,6 +281,7 @@ async function viewCheck(id) {
 
 function row(k, v) { return '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>'; }
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+setProvider('openai', false); // default choice + placeholders on load
 </script>
 </body>
 </html>
