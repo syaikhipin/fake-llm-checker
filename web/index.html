@@ -32,7 +32,6 @@
 <body>
 <h1>🕵️ fake-llm-checker</h1>
 <p class="sub">Check whether a cheap third-party LLM API endpoint is a man-in-the-middle proxy.
-Powered by <a href="https://github.com/astrozeta/api-scam-hunter">APIScamHunter</a> (MIT).
 Your LLM key is used only for the scan and never stored.</p>
 
 <label>Service API key <span class="mono">(x-api-key for this service)</span></label>
@@ -70,7 +69,7 @@ Your LLM key is used only for the scan and never stored.</p>
 <button id="histbtn" onclick="loadHistory()" style="width:auto;margin-top:4px">Load history</button>
 <div id="hist" style="margin-top:12px"></div>
 
-<p class="note">Limits, inherited from APIScamHunter: a passing score is not a safety certificate —
+<p class="note">Limits of the scan engine: a passing score is not a safety certificate —
 it cannot detect a proxy that forwards your prompt untouched while logging it. Never route code,
 secrets or personal data through a non-official endpoint.</p>
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# APIScamHunter :: fingerprint — behavioural profile of the model an endpoint actually serves.
+# fake-llm-checker :: fingerprint — behavioural profile of the model an endpoint actually serves.
 # Capability battery + self-report + determinism + latency. Helps catch a silent model downgrade.
 #
 # Defensive / consumer-protection only. Reports a CAPABILITY PROFILE, not a hard "it is/isn't
@@ -42,11 +42,11 @@ try:
 except Exception: pass" 2>/dev/null; fi; }
 
 if [ "$PROVIDER" = "openai" ]; then
-  AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: APIScamHunter/1.0")
+  AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
   ENDPOINT="$BASE/v1/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "model" "choices" "usage"'
   mkbody(){ printf '{"model":"%s","max_tokens":%s,"temperature":0,"messages":[{"role":"user","content":%s}]}' "$MODEL" "$2" "$(jstr "$1")"; }
 else
-  AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: APIScamHunter/1.0")
+  AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
   ENDPOINT="$BASE/v1/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "model" "stop_reason" "usage"'
   mkbody(){ printf '{"model":"%s","max_tokens":%s,"temperature":0,"messages":[{"role":"user","content":%s}]}' "$MODEL" "$2" "$(jstr "$1")"; }
 fi
@@ -74,7 +74,7 @@ ask(){ # $1=prompt $2=max
   ANS=$(jget "$payload" "$TEXTKEY")
 }
 
-echo; echo "${CYN}=== APIScamHunter :: fingerprint ===${NC}"
+echo; echo "${CYN}=== fake-llm-checker :: fingerprint ===${NC}"
 echo "Endpoint: $BASE  (provider: $PROVIDER, model requested: $MODEL)"
 [ "$VIACLI" = "1" ] && echo "Transport: real CLI binary (claude -p)" || echo "Transport: direct HTTP"
 

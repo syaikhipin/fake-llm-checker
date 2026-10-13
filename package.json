@@ -1,1 +1,13 @@
-{"dependencies":{"express":"^4.21.2"},"description":"SaaS wrapper around APIScamHunter: check whether a cheap LLM API endpoint is a man-in-the-middle proxy","license":"MIT","main":"src/server.js","name":"fake-llm-checker","scripts":{"start":"node src/server.js"},"version":"0.1.0"}
+{
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "description": "Check whether a cheap LLM API endpoint is a man-in-the-middle proxy",
+  "license": "MIT",
+  "main": "src/server.js",
+  "name": "fake-llm-checker",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "version": "0.1.0"
+}

@@ -1,5 +1,5 @@
 # fake-llm-checker — single-container SaaS (API + in-process scan runner + SQLite).
-# Needs: bash, curl, openssl, python3 (for the vendored APIScamHunter scripts).
+# Needs: bash, curl, openssl, python3 (for the vendored scan-engine scripts).
 FROM node:24-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,7 +13,7 @@ RUN npm install --omit=dev
 COPY src ./src
 COPY web ./web
 COPY vendor ./vendor
-RUN chmod +x vendor/api-scam-hunter/*.sh
+RUN chmod +x vendor/engine/*.sh
 
 ENV NODE_ENV=production \
     PORT=3000 \

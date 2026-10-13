@@ -1,10 +1,10 @@
-// Runs the vendored APIScamHunter orchestrator for one job and parses its
+// Runs the vendored scan-engine orchestrator for one job and parses its
 // machine-readable summary lines (#APISH ...) plus the VERDICT banner.
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const SCRIPT = path.join(__dirname, '..', 'vendor', 'api-scam-hunter', 'apiscamhunter.sh');
+const SCRIPT = path.join(__dirname, '..', 'vendor', 'engine', 'scan.sh');
 const TIMEOUT_MS = parseInt(process.env.SCAN_TIMEOUT_MS || '600000', 10); // 10 min default
 
 const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -38,7 +38,7 @@ function parseTranscript(text) {
 
 function findReportHtml(jobDir) {
   try {
-    const f = fs.readdirSync(jobDir).find((n) => n.endsWith('.html') && n.startsWith('apiscamhunter-'));
+    const f = fs.readdirSync(jobDir).find((n) => n.endsWith('.html') && n.startsWith('fake-llm-checker-'));
     return f ? path.join(jobDir, f) : null;
   } catch { return null; }
 }

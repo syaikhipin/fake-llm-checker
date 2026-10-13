@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# APIScamHunter — evidence collector. Tries to make a reseller proxy reveal the hidden system
+# fake-llm-checker — evidence collector. Tries to make a reseller proxy reveal the hidden system
 # prompt / persona it injects into YOUR OWN purchased endpoint, and the model really serving you.
 #
 # Defensive / consumer-protection ONLY. Prompt-LEAKING for evidence, not a jailbreak for harmful
@@ -30,10 +30,10 @@ if [ -z "$MODEL_IN" ]; then [ "$PROVIDER" = "openai" ] && MODEL="gpt-4o" || MODE
 OUT="${OUT:-scam-evidence-$(date +%Y%m%d-%H%M%S).txt}"
 
 if [ "$PROVIDER" = "openai" ]; then
-  AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: APIScamHunter/1.0")
+  AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
   ENDPOINT="$BASE/v1/chat/completions"; TEXTKEY="choices.0.message.content"; CANON='"id" "object" "choices" "usage"'
 else
-  AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: APIScamHunter/1.0")
+  AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
   ENDPOINT="$BASE/v1/messages"; TEXTKEY="content.0.text"; CANON='"id" "role" "stop_reason" "usage"'
 fi
 jstr(){ if command -v python3 >/dev/null 2>&1; then printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))'; else printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g;s/"/\\"/g')"; fi; }
@@ -93,7 +93,7 @@ ZWWORD="sy${ZW}stem pro${ZW}mpt"
 H_E=$'е'; H_O=$'о'; H_C=$'с'
 
 stamp=$(date -u +'%Y-%m-%d %H:%M:%SZ')
-{ echo "APIScamHunter - system-prompt extraction transcript"; echo "When: $stamp"; echo "Endpoint: $BASE  (provider: $PROVIDER)"
+{ echo "fake-llm-checker - system-prompt extraction transcript"; echo "When: $stamp"; echo "Endpoint: $BASE  (provider: $PROVIDER)"
   echo "Transport: $([ "$VIACLI" = "1" ] && echo 'real CLI binary (claude -p)' || echo 'direct HTTP')"
   echo "Requested model: $MODEL"; echo "Key prefix: ${KEY:0:8}..."; printf '%.0s=' {1..70}; echo; } | tee "$OUT"
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# APIScamHunter :: recon — infrastructure & OSINT for an AI API endpoint. NO LLM calls (free).
+# fake-llm-checker :: recon — infrastructure & OSINT for an AI API endpoint. NO LLM calls (free).
 # Passive recon (public DNS, RDAP, crt.sh, HTTP, TLS) on an endpoint you are evaluating. It does
 # NOT attack anything and never sends your API key anywhere. Reports CONTEXT, not a fraud verdict:
 # a young domain or Cloudflare is a fact, not proof. one-api fingerprint + economic math are the
@@ -31,7 +31,7 @@ except Exception: pass" "$1"
   else getent ahostsv4 "$1" 2>/dev/null | awk '{print $1}' | sort -u; fi
 }
 
-echo; echo "${CYN}=== APIScamHunter :: recon ===${NC}"
+echo; echo "${CYN}=== fake-llm-checker :: recon ===${NC}"
 echo "Domain: $DOMAIN"
 
 echo; echo "[1] DNS & hosting"

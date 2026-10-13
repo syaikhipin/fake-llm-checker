@@ -1,4 +1,4 @@
-// fake-llm-checker API: enqueue APIScamHunter scans, poll for verdicts,
+// fake-llm-checker API: enqueue endpoint scans, poll for verdicts,
 // download the generated HTML evidence report.
 const crypto = require('crypto');
 const dns = require('dns').promises;

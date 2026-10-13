@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# APIScamHunter — checks whether an AI API endpoint (Claude/Anthropic- or OpenAI-style) is
+# fake-llm-checker — checks whether an AI API endpoint (Claude/Anthropic- or OpenAI-style) is
 # legitimate or a man-in-the-middle reseller proxy. Defensive / consumer-protection only.
 # Needs: curl. (python3 used for JSON if present; falls back to grep.)
 #
@@ -54,13 +54,13 @@ except Exception: pass" 2>/dev/null
 
 # provider-specific request shapes
 if [ "$PROVIDER" = "openai" ]; then
-  AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: APIScamHunter/1.0")
+  AUTH=(-H "Authorization: Bearer $KEY" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
   ENDPOINT="$BASE/v1/chat/completions"; IDPFX="chatcmpl-"
   body(){ if [ -n "$1" ]; then printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"system","content":"%s"},{"role":"user","content":"%s"}]}' "$3" "$4" "$1" "$2"
     else printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$2"; fi; }
   gettext(){ jget "$1" "choices.0.message.content"; }
 else
-  AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: APIScamHunter/1.0")
+  AUTH=(-H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" -H "User-Agent: fake-llm-checker/1.0")
   ENDPOINT="$BASE/v1/messages"; IDPFX="msg_"
   body(){ if [ -n "$1" ]; then printf '{"model":"%s","max_tokens":%s,"system":"%s","messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$1" "$2"
     else printf '{"model":"%s","max_tokens":%s,"messages":[{"role":"user","content":"%s"}]}' "$3" "$4" "$2"; fi; }
@@ -78,7 +78,7 @@ req(){ # $1=method $2=url $3=body(optional)
 }
 is2xx(){ [ "${STATUS:-0}" -ge 200 ] 2>/dev/null && [ "${STATUS:-0}" -lt 300 ] 2>/dev/null; }
 
-echo; echo "${CYN}=== APIScamHunter ===${NC}"
+echo; echo "${CYN}=== fake-llm-checker ===${NC}"
 echo "Endpoint : $BASE  (provider: $PROVIDER)"
 echo "Key      : ${KEY:0:8}...  Requested model: $MODEL"
 [ "$KNOWN" = "1" ] && echo "${DIM}Mode     : KNOWN (a gateway is expected; judging malice only)${NC}"
@@ -207,6 +207,6 @@ elif [ "$interposed" = "1" ]; then
 else
   echo "${GRN}No interposition and no malicious behaviour detected. Behaves like a legitimate, direct endpoint.${NC}"
 fi
-# machine-readable summary line for the apiscamhunter orchestrator
+# machine-readable summary line for the scan orchestrator
 if [ "$malice" -ge 1 ]; then vtag=fraud; elif [ "$interposed" = "1" ]; then vtag=interposed; else vtag=clean; fi
 echo "#APISH check verdict=$vtag malice=$malice interposed=$interposed"

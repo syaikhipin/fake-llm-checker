@@ -3,10 +3,10 @@
 A tiny SaaS that answers one question: **is that cheap LLM API endpoint you bought
 actually a man-in-the-middle proxy?**
 
-It wraps [APIScamHunter](https://github.com/astrozeta/api-scam-hunter) (MIT, vendored
-in `vendor/`) in a web service: submit an endpoint + key, get a verdict
+It wraps an MIT-licensed open-source scan engine (vendored in `vendor/engine/`,
+see `LICENSE` there) in a web service: submit an endpoint + key, get a verdict
 (🟢 clean / 🟡 middleman / 🟠 anomaly / 🔴 fraud) plus the full HTML evidence report
-the upstream tool generates. 100% free stack: Node.js, SQLite, Docker — deployable
+the scan generates. 100% free stack: Node.js, SQLite, Docker — deployable
 on Render's free tier.
 
 ## How it works
@@ -113,5 +113,6 @@ a verdict — otherwise the upstream heuristics would misread "auth failed" as
 
 ## Credits
 
-Scanner: [astrozeta/api-scam-hunter](https://github.com/astrozeta/api-scam-hunter)
-(MIT) — vendored at commit `e366378`. SaaS wrapper: MIT.
+Scan engine: MIT-licensed open-source scripts vendored under `vendor/engine/`
+(display strings rebranded to fake-llm-checker; scan logic unmodified).
+SaaS wrapper: MIT.

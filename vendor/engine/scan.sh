@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# APIScamHunter master orchestrator (bash). Runs the analysis modules at a chosen depth,
+# fake-llm-checker master orchestrator (bash). Runs the analysis modules at a chosen depth,
 # aggregates their results into one verdict, and writes a Markdown + HTML evidence report.
 # Defensive / consumer-protection only.
 #
@@ -12,9 +12,9 @@
 # Verdict uses five categories; FRAUDULENT BEHAVIOUR requires TWO independent malicious signals.
 #
 # Usage:
-#   ./apiscamhunter.sh <base_url> <api_key> [model]
-#   FULL=1 PRICE=1.5 ./apiscamhunter.sh <base_url> <api_key>
-#   MODULE=recon ./apiscamhunter.sh <base_url> <api_key>
+#   ./scan.sh <base_url> <api_key> [model]
+#   FULL=1 PRICE=1.5 ./scan.sh <base_url> <api_key>
+#   MODULE=recon ./scan.sh <base_url> <api_key>
 set -uo pipefail
 
 BASE="${1:-${ANTHROPIC_BASE_URL:-}}"
@@ -22,7 +22,7 @@ KEY="${2:-${ANTHROPIC_API_KEY:-}}"
 MODEL="${3:-}"
 QUICK="${QUICK:-0}"; FULL="${FULL:-0}"; MODULE="${MODULE:-}"
 PRICE="${PRICE:-0}"; TIER="${TIER:-opus}"; VIACLI="${VIACLI:-0}"; OUTDIR="${OUTDIR:-.}"
-[ -z "$BASE" ] || [ -z "$KEY" ] && { echo "Usage: ./apiscamhunter.sh <base_url> <api_key> [model]"; exit 1; }
+[ -z "$BASE" ] || [ -z "$KEY" ] && { echo "Usage: ./scan.sh <base_url> <api_key> [model]"; exit 1; }
 BASE="${BASE%/}"
 DOMAIN=$(echo "$BASE" | sed -E 's#^[a-z]+://##; s#/.*##; s#:.*##')
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -35,7 +35,7 @@ elif [ "$FULL" = "1" ];  then PLAN="recon check fingerprint extract"; LEVEL=Full
 else PLAN="recon check"; LEVEL=Standard; fi
 
 echo; echo "${CYN}###############################################${NC}"
-echo "${CYN}#  APIScamHunter  --  $LEVEL scan${NC}"
+echo "${CYN}#  fake-llm-checker  --  $LEVEL scan${NC}"
 echo "${CYN}#  $DOMAIN${NC}"
 echo "${CYN}###############################################${NC}"
 
@@ -88,12 +88,12 @@ echo; echo "${CYN}###############################################${NC}"
 echo "${CYN}#  VERDICT: $CATE${NC}"
 echo "${CYN}###############################################${NC}"
 
-BASEOUT="$OUTDIR/apiscamhunter-$DOMAIN-$TS"
+BASEOUT="$OUTDIR/fake-llm-checker-$DOMAIN-$TS"
 STAMP=$(date -u +'%Y-%m-%d %H:%M:%SZ')
 
 # ---- Markdown ----
 {
-  echo "# APIScamHunter report"; echo
+  echo "# fake-llm-checker report"; echo
   echo "**Verdict: $CATE**"; echo
   echo "- Endpoint: \`$BASE\`"; echo "- Scan level: $LEVEL"; echo "- Date: $STAMP"; echo
   echo "## Summary by module"; echo
@@ -139,9 +139,9 @@ STAMP=$(date -u +'%Y-%m-%d %H:%M:%SZ')
 # ---- HTML ----
 case "$KEY_C" in fraud) COL='#ff5a52';; anomaly|middleman) COL='#febc2e';; clean) COL='#28c840';; *) COL='#8a8a8a';; esac
 {
-  echo "<!doctype html><meta charset=\"utf-8\"><title>APIScamHunter report - $DOMAIN</title>"
+  echo "<!doctype html><meta charset=\"utf-8\"><title>fake-llm-checker report - $DOMAIN</title>"
   echo "<style>body{background:#0c0c0c;color:#d6d6d6;font-family:Segoe UI,system-ui,sans-serif;max-width:900px;margin:0 auto;padding:32px}h1{font-size:24px}h2{font-size:18px;margin-top:28px;border-bottom:1px solid #222;padding-bottom:6px}h3{color:#9a9a9a;font-size:14px}.verdict{font-size:26px;font-weight:800;color:$COL;padding:16px 20px;border:2px solid $COL;border-radius:10px;margin:18px 0}table{border-collapse:collapse;width:100%}td{border:1px solid #222;padding:8px 12px;font-size:14px}tr td:first-child{color:#9fb0c3;width:34%}pre{background:#141414;border:1px solid #222;border-radius:8px;padding:14px;font-size:12.5px;white-space:pre-wrap;word-break:break-word;color:#cfcfcf;font-family:Consolas,monospace}.meta{color:#8a8a8a;font-size:13px}.lim{background:#1a1410;border-left:3px solid #b5673f;padding:10px 14px;font-size:13px;color:#caa}</style>"
-  echo "<h1>APIScamHunter report</h1>"
+  echo "<h1>fake-llm-checker report</h1>"
   echo "<div class=\"verdict\">$CATE</div>"
   echo "<div class=\"meta\">Endpoint: <code>$BASE</code> &middot; Level: $LEVEL &middot; $STAMP</div>"
   echo "<h2>Summary by module</h2><table>"
