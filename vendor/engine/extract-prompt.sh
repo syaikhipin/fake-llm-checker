@@ -20,6 +20,11 @@ VIACLI="${VIACLI:-0}"
 CLI_RETRIES="${CLI_RETRIES:-4}"
 [ -z "$BASE" ] || [ -z "$KEY" ] && { echo "Usage: ./extract-prompt.sh <base_url> <api_key> [model]"; exit 1; }
 BASE="${BASE%/}"
+# The UI sends only the base (never /chat/completions or /messages); strip any
+# path suffix a caller may have pasted so the versioned path below is
+# appended exactly once.
+BASE="${BASE%/messages}"
+BASE="${BASE%/v1}"
 RED=$'\e[31m'; GRN=$'\e[32m'; YEL=$'\e[33m'; CYN=$'\e[36m'; DIM=$'\e[2m'; NC=$'\e[0m'
 ZW=$'​'  # zero-width space
 

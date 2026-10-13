@@ -160,22 +160,32 @@ function setProvider(p, fill) {
   if (p === 'openai') {
     base.placeholder = 'https://api.openai.com/v1';
     model.placeholder = 'gpt-4o';
-    $('baseHelp').innerHTML = 'Paste the base exactly as given — a trailing <code>/v1</code> is fine, e.g. ' +
-      '<code>https://api.openai.com/v1</code> (Zhipu: <code>https://api.z.ai/api/coding/paas/v4</code>). ' +
+    $('baseHelp').innerHTML = 'The base must end with <code>/v1</code>, e.g. ' +
+      '<code>https://api.openai.com/v1</code> — it is added automatically if you forget it. ' +
+      '(Zhipu: <code>https://api.z.ai/api/coding/paas/v4</code>, no <code>/v1</code> there.) ' +
       'The <code>/chat/completions</code> part is added for you.';
     if (fill) { base.value = 'https://api.openai.com/v1'; model.value = 'gpt-4o'; }
   } else {
     base.placeholder = 'https://api.anthropic.com';
     model.placeholder = 'claude-opus-4-8';
-    $('baseHelp').innerHTML = 'The base is just the host, e.g. <code>https://api.anthropic.com</code> — no path. ' +
-      'The <code>/v1/messages</code> part is added for you.';
+    $('baseHelp').innerHTML = 'Just the host, e.g. <code>https://api.anthropic.com</code> — never type ' +
+      '<code>/messages</code> yourself, it is added for you. (If you paste a full path by ' +
+      'mistake, the extra part is stripped automatically.)';
     if (fill) { base.value = 'https://api.anthropic.com'; model.value = 'claude-opus-4-8'; }
   }
 }
-// Forgiving normalization: trim, drop trailing slashes, drop one trailing /v1
-// (so https://api.openai.com/v1 and https://api.openai.com both work).
+// Normalization: the user types only the base — never /chat/completions or
+// /messages. Strip any path suffix they may have pasted, then for
+// OpenAI-compatible endpoints the trailing /v1 is MANDATORY, so re-add it
+// (Zhipu-style bases like .../paas/v4 are the exception: they have no /v1).
 function normalizeBase(u) {
-  return u.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
+  u = u.trim().replace(/\/+$/, '')
+    .replace(/\/v1\/messages$/i, '')
+    .replace(/\/(chat\/completions|messages)$/i, '')
+    .replace(/\/v1$/i, '')
+    .replace(/\/+$/, '');
+  if (provider === 'openai' && !/[/.]z\.ai[/:]|bigmodel\.cn/i.test(u)) u += '/v1';
+  return u;
 }
 
 async function start() {
