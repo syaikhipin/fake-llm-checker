@@ -25,6 +25,8 @@
   a{color:#7aa2ff}
   .note{font-size:12px;color:#8a8a8a;margin-top:22px;border-top:1px solid #222;padding-top:12px}
   .mono{font-family:Consolas,monospace;font-size:12px;color:#9a9a9a}
+  .vbadge{font-size:12px;font-weight:700;padding:3px 10px;border:1.5px solid;border-radius:20px;white-space:nowrap}
+  h2.sec{font-size:18px;margin:34px 0 4px}
 </style>
 </head>
 <body>
@@ -62,6 +64,11 @@ Your LLM key is used only for the scan and never stored.</p>
 <button id="go" onclick="start()">Run the check</button>
 
 <div id="out"></div>
+
+<h2 class="sec">Scan history</h2>
+<p class="sub">Past scans on this instance (uses the service API key above).</p>
+<button id="histbtn" onclick="loadHistory()" style="width:auto;margin-top:4px">Load history</button>
+<div id="hist" style="margin-top:12px"></div>
 
 <p class="note">Limits, inherited from APIScamHunter: a passing score is not a safety certificate —
 it cannot detect a proxy that forwards your prompt untouched while logging it. Never route code,
@@ -110,6 +117,7 @@ async function poll(svc, id) {
       if (['done','error','timeout'].includes(j.status)) {
         clearInterval(timer);
         $('go').disabled = false;
+        if (histLoaded) loadHistory();
       }
     } catch (e) {
       clearInterval(timer);
@@ -139,6 +147,44 @@ function render(j) {
 }
 function row(k, v) { return '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>'; }
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+let histLoaded = false;
+async function loadHistory() {
+  const svc = $('svc').value.trim();
+  if (!svc) { alert('Enter your service API key first.'); return; }
+  $('hist').innerHTML = '<p class="mono">Loading…</p>';
+  try {
+    const r = await fetch('/api/checks', {headers:{'x-api-key': svc}});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    histLoaded = true;
+    if (!j.checks.length) { $('hist').innerHTML = '<p class="mono">No scans yet.</p>'; return; }
+    let h = '<table><tr><td><b>Time (UTC)</b></td><td><b>Endpoint</b></td><td><b>Level</b></td><td><b>Status</b></td><td><b>Verdict</b></td></tr>';
+    for (const c of j.checks) {
+      h += '<tr><td class="mono">' + esc((c.created_at || '').replace('T',' ').slice(0,19)) + '</td>'
+        + '<td><a href="#" onclick="viewCheck(\'' + esc(c.id) + '\');return false;">' + esc(c.base_url) + '</a></td>'
+        + '<td>' + esc(c.level) + '</td><td>' + esc(c.status) + '</td>'
+        + '<td>' + (c.verdict
+            ? '<span class="vbadge v-' + esc(c.verdict) + '">' + esc(NAMES[c.verdict] || c.verdict) + '</span>'
+            : '—') + '</td></tr>';
+    }
+    $('hist').innerHTML = h + '</table>';
+  } catch (e) {
+    $('hist').innerHTML = '<p style="color:#ff5a52">Error: ' + esc(e.message) + '</p>';
+  }
+}
+async function viewCheck(id) {
+  const svc = $('svc').value.trim();
+  try {
+    const r = await fetch('/api/checks/' + encodeURIComponent(id), {headers:{'x-api-key': svc}});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    render(j);
+    document.getElementById('out').scrollIntoView({behavior:'smooth'});
+  } catch (e) {
+    alert('Could not load check: ' + e.message);
+  }
+}
 </script>
 </body>
 </html>
