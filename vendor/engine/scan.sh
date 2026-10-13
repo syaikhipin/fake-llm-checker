@@ -137,10 +137,10 @@ STAMP=$(date -u +'%Y-%m-%d %H:%M:%SZ')
 } > "$BASEOUT.md"
 
 # ---- HTML ----
-case "$KEY_C" in masked) COL='#ff5a52';; suspicious|unverified) COL='#febc2e';; real) COL='#28c840';; *) COL='#8a8a8a';; esac
+case "$KEY_C" in masked) COL='#dc2626';; suspicious|unverified) COL='#d97706';; real) COL='#16a34a';; *) COL='#6b7280';; esac
 {
   echo "<!doctype html><meta charset=\"utf-8\"><title>fake-llm-checker report - $DOMAIN</title>"
-  echo "<style>body{background:#0c0c0c;color:#d6d6d6;font-family:Segoe UI,system-ui,sans-serif;max-width:900px;margin:0 auto;padding:32px}h1{font-size:24px}h2{font-size:18px;margin-top:28px;border-bottom:1px solid #222;padding-bottom:6px}h3{color:#9a9a9a;font-size:14px}.verdict{font-size:26px;font-weight:800;color:$COL;padding:16px 20px;border:2px solid $COL;border-radius:10px;margin:18px 0}table{border-collapse:collapse;width:100%}td{border:1px solid #222;padding:8px 12px;font-size:14px}tr td:first-child{color:#9fb0c3;width:34%}pre{background:#141414;border:1px solid #222;border-radius:8px;padding:14px;font-size:12.5px;white-space:pre-wrap;word-break:break-word;color:#cfcfcf;font-family:Consolas,monospace}.meta{color:#8a8a8a;font-size:13px}.lim{background:#1a1410;border-left:3px solid #b5673f;padding:10px 14px;font-size:13px;color:#caa}</style>"
+  echo "<style>body{background:#fff;color:#1e293b;font-family:Segoe UI,system-ui,sans-serif;max-width:900px;margin:0 auto;padding:32px}h1{font-size:24px;color:#0f172a}h2{font-size:18px;margin-top:28px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;color:#0f172a}h3{color:#64748b;font-size:14px}.verdict{font-size:26px;font-weight:800;color:$COL;padding:16px 20px;border:2px solid $COL;border-radius:10px;margin:18px 0}table{border-collapse:collapse;width:100%}td{border:1px solid #e2e8f0;padding:8px 12px;font-size:14px}tr td:first-child{color:#475569;width:34%;font-weight:600}pre{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;font-size:12.5px;white-space:pre-wrap;word-break:break-word;color:#334155;font-family:Consolas,monospace}.meta{color:#64748b;font-size:13px}.meta code{color:#4f46e5}li{font-size:14px;margin-bottom:6px}.lim{background:#fffbeb;border-left:3px solid #f59e0b;padding:10px 14px;font-size:13px;color:#92400e}</style>"
   echo "<h1>fake-llm-checker report</h1>"
   echo "<div class=\"verdict\">$CATE</div>"
   echo "<div class=\"meta\">Endpoint: <code>$BASE</code> &middot; Level: $LEVEL &middot; $STAMP</div>"
