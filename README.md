@@ -26,12 +26,11 @@ browser ──POST /api/checks──▶ Express API ──SQLite queue──▶ 
   jobs rather than persisting keys.
 - **SSRF guard**: the target hostname must resolve to a public IP (no localhost,
   private ranges, or `169.254.x.x` metadata).
-- **Service auth**: every `/api/*` call needs `x-api-key` (your own service key).
+- **Rate limiting**: 60 requests/minute per IP, plus a cap on concurrent scans.
 
 ## Quickstart (local, Docker)
 
 ```bash
-cp .env.example .env        # set SERVICE_API_KEY to a long random string
 docker compose up --build   # → http://localhost:3000
 ```
 
@@ -39,24 +38,23 @@ Or without Docker (needs node ≥ 22, bash, curl, openssl, python3):
 
 ```bash
 npm install
-SERVICE_API_KEY=secret DATA_DIR=./data npm start
+DATA_DIR=./data npm start
 ```
 
 ## Free deploy (Render)
 
 1. Push this repo to GitHub.
 2. Render → New → Blueprint → point at the repo (`render.yaml`).
-3. Set `SERVICE_API_KEY` in the dashboard (generate a random string).
-4. Open the service URL. Note: the free tier has no persistent disk, so SQLite
+3. Open the service URL. Note: the free tier has no persistent disk, so SQLite
    results reset on redeploy — fine for a checker, documented limitation.
 
 ## API
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/healthz` | no auth |
+| GET | `/healthz` | liveness probe |
 | GET | `/` | web UI |
-| POST | `/api/checks` | `x-api-key` required → `202 {id, pollUrl}` |
+| POST | `/api/checks` | → `202 {id, pollUrl}` |
 | GET | `/api/checks` | last 20 checks |
 | GET | `/api/checks/:id` | status + verdict + signals (never the key) |
 | GET | `/api/checks/:id/report` | upstream HTML evidence report |
@@ -80,11 +78,11 @@ free) · `full` (+ model fingerprint + prompt extraction — slower, more API ca
 Example:
 
 ```bash
-curl -s -H "x-api-key: $SERVICE_API_KEY" -H 'Content-Type: application/json' \
+curl -s -H 'Content-Type: application/json' \
   -d '{"baseUrl":"https://cheap-api.example.com","apiKey":"sk-...","level":"quick"}' \
   http://localhost:3000/api/checks
 # → {"id":"...","status":"queued","pollUrl":"/api/checks/..."}
-curl -s -H "x-api-key: $SERVICE_API_KEY" http://localhost:3000/api/checks/<id>
+curl -s http://localhost:3000/api/checks/<id>
 ```
 
 ## Dead keys don't produce verdicts
@@ -104,7 +102,6 @@ a verdict — otherwise the upstream heuristics would misread "auth failed" as
 
 ## Security notes for operators
 
-- Rotate `SERVICE_API_KEY` if ever exposed; it's compared as sha256 in constant time.
 - The scan spawns `bash` with a 10-minute kill timeout (`SCAN_TIMEOUT_MS`); the
   whole process group is SIGKILLed on timeout.
 - Rate limit: 60 req/min per IP + cap on concurrent checks (`MAX_ACTIVE_CHECKS`).

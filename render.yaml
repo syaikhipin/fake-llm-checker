@@ -8,8 +8,6 @@ services:
     plan: free
     healthCheckPath: /healthz
     envVars:
-      - key: SERVICE_API_KEY
-        sync: false # set in the Render dashboard (generate a long random string)
       - key: DATA_DIR
         value: /data
       - key: MAX_CONCURRENT_SCANS

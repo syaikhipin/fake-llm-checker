@@ -70,13 +70,7 @@
   </header>
 
   <div class="card">
-    <h2>1 · Your access</h2>
-    <p class="desc">The key for <i>this</i> service (set as <span class="mono">SERVICE_API_KEY</span> where it's deployed).</p>
-    <input id="svc" type="password" placeholder="your fake-llm-checker service key" autocomplete="off">
-  </div>
-
-  <div class="card">
-    <h2>2 · The endpoint to test</h2>
+    <h2>1 · The endpoint to test</h2>
     <p class="desc">Not sure what to type? Pick a preset — then paste the key the seller gave you.</p>
     <div class="presets">
       <button class="preset" onclick="preset('claude')">
@@ -168,15 +162,13 @@ function preset(which) {
 }
 
 async function start() {
-  const svc = $('svc').value.trim();
-  if (!svc) { alert('Enter your service API key first (section 1).'); return; }
   if (!$('base').value.trim() || !$('key').value) { alert('Fill in the endpoint URL and the API key you bought.'); return; }
   $('go').disabled = true;
   $('out').innerHTML = '<p class="mono">Scan queued — this usually takes under a minute…</p>';
   try {
     const r = await fetch('/api/checks', {
       method: 'POST',
-      headers: {'Content-Type':'application/json','x-api-key': svc},
+      headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         baseUrl: $('base').value.trim(),
         apiKey: $('key').value,
@@ -187,18 +179,18 @@ async function start() {
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.statusText);
-    poll(svc, j.id);
+    poll(j.id);
   } catch (e) {
     $('out').innerHTML = '<p class="err">Error: ' + esc(e.message) + '</p>';
     $('go').disabled = false;
   }
 }
 
-async function poll(svc, id) {
+async function poll(id) {
   clearInterval(timer);
   timer = setInterval(async () => {
     try {
-      const r = await fetch('/api/checks/' + id, {headers:{'x-api-key': svc}});
+      const r = await fetch('/api/checks/' + id);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || r.statusText);
       render(j);
@@ -235,11 +227,9 @@ function render(j) {
 }
 
 async function loadHistory() {
-  const svc = $('svc').value.trim();
-  if (!svc) { alert('Enter your service API key first (section 1).'); return; }
   $('hist').innerHTML = '<p class="mono">Loading…</p>';
   try {
-    const r = await fetch('/api/checks', {headers:{'x-api-key': svc}});
+    const r = await fetch('/api/checks');
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.statusText);
     histLoaded = true;
@@ -260,9 +250,8 @@ async function loadHistory() {
 }
 
 async function viewCheck(id) {
-  const svc = $('svc').value.trim();
   try {
-    const r = await fetch('/api/checks/' + encodeURIComponent(id), {headers:{'x-api-key': svc}});
+    const r = await fetch('/api/checks/' + encodeURIComponent(id));
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.statusText);
     render(j);

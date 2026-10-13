@@ -7,7 +7,6 @@ const fs = require('fs');
 const path = require('path');
 
 const db = require('./db');
-const { auth } = require('./auth');
 const { rateLimit } = require('./ratelimit');
 const runner = require('./runner');
 
@@ -54,7 +53,7 @@ const LEVELS = ['quick', 'standard', 'full'];
 
 app.get('/healthz', (req, res) => res.json({ ok: true, service: 'fake-llm-checker' }));
 
-app.post('/api/checks', auth, rateLimit, async (req, res) => {
+app.post('/api/checks', rateLimit, async (req, res) => {
   try {
     const { baseUrl, apiKey, model, level = 'standard', price, tier, known } = req.body || {};
     if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 8) {
@@ -83,17 +82,17 @@ app.post('/api/checks', auth, rateLimit, async (req, res) => {
   }
 });
 
-app.get('/api/checks', auth, rateLimit, (req, res) => {
+app.get('/api/checks', rateLimit, (req, res) => {
   res.json({ checks: db.list() });
 });
 
-app.get('/api/checks/:id', auth, rateLimit, (req, res) => {
+app.get('/api/checks/:id', rateLimit, (req, res) => {
   const row = db.get(req.params.id);
   if (!row) return res.status(404).json({ error: 'unknown check id' });
   res.json(row);
 });
 
-app.get('/api/checks/:id/report', auth, rateLimit, (req, res) => {
+app.get('/api/checks/:id/report', rateLimit, (req, res) => {
   const row = db.get(req.params.id);
   if (!row) return res.status(404).json({ error: 'unknown check id' });
   if (!['done', 'timeout'].includes(row.status) || !row.report_path) {
